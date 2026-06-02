@@ -134,7 +134,7 @@ export default function AccessoriesPage() {
   const F = (k: keyof Accessory, v: unknown) => setForm(prev => ({ ...prev, [k]: v }));
 
   return (
-    <div className="space-y-5 max-w-[1200px]">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

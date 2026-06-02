@@ -49,7 +49,7 @@ export default function PayslipsPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-[1000px]">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Payslips</h2>

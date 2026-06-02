@@ -135,7 +135,7 @@ export default function UsedBikesPage() {
   const F = (k: keyof UsedBike, v: unknown) => setForm(p => ({ ...p, [k]: v }));
 
   return (
-    <div className="space-y-5 max-w-[1200px]">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
