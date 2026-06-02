@@ -289,7 +289,7 @@ export default function ReportsPage() {
           { label: "Margin", value: `${margin.toFixed(1)}%`, sub: "Profit margin", icon: BarChart2, accent: false, up: margin > 20 },
           { label: "Commission", value: fmt(totalComm), sub: "TVS + Finance + Ins.", icon: Receipt, accent: false, up: totalComm > 0 },
         ].map(({ label, value, sub, icon: Icon, accent, up }) => (
-          <div key={label} className={`bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border ${accent ? "border-[#FF4C00]/15" : "border-white"}`}>
+          <div key={label} className={`bg-white rounded-2xl p-5 border ${accent ? "border-[#FF4C00]/15" : "border-[#E8E8E8]"}`}>
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-widest">{label}</span>
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${accent ? "bg-[#FF4C00]" : up ? "bg-emerald-50" : "bg-[#F5F5F5]"}`}>
@@ -325,58 +325,60 @@ export default function ReportsPage() {
       {/* ════════════════════════════════════════════════════════ */}
       {tab === "pl" && (
         <div className="space-y-5">
-          {/* Charts row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Revenue vs Expenses area chart */}
-            <div className="bg-white rounded-2xl p-6 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white">
-              <h3 className="text-sm font-bold text-[#0A0A0A] mb-1" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Revenue vs Expenses — {year}</h3>
-              <p className="text-xs text-[#9A9A9A] mb-4">Monthly comparison</p>
-              {loading ? <div className="h-52 bg-[#F5F5F5] rounded-xl animate-pulse" /> : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={monthly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#FF4C00" stopOpacity={0.15} />
-                        <stop offset="95%" stopColor="#FF4C00" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gExp" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6B7280" stopOpacity={0.1} />
-                        <stop offset="95%" stopColor="#6B7280" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" vertical={false} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
-                    <Tooltip content={<CT />} />
-                    <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#FF4C00" strokeWidth={2.5} fill="url(#gRev)" />
-                    <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#9CA3AF" strokeWidth={2} fill="url(#gExp)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
+          {/* Full-width Revenue vs Expenses chart */}
+          <div className="bg-white border border-[#E8E8E8] rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Revenue vs Expenses — {year}</h3>
+                <p className="text-[11px] text-[#ABABAB] mt-0.5">Monthly comparison across all 12 months</p>
+              </div>
+              <div className="flex items-center gap-4 text-[11px] text-[#ABABAB]">
+                {[{ c: "#FF4C00", l: "Revenue" }, { c: "#D0D0D0", l: "Expenses" }].map(x => (
+                  <div key={x.l} className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded" style={{ background: x.c }} /><span>{x.l}</span></div>
+                ))}
+              </div>
             </div>
+            {loading ? <div className="h-64 bg-[#F8F8F8] rounded-xl animate-pulse" /> : (
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={monthly} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#FF4C00" stopOpacity={0.12} />
+                      <stop offset="95%" stopColor="#FF4C00" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="#F0F0F0" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
+                  <Tooltip content={<CT />} />
+                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#FF4C00" strokeWidth={2.5} fill="url(#gRev)" dot={false} />
+                  <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#D0D0D0" strokeWidth={1.5} fill="none" strokeDasharray="4 2" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
 
-            {/* Profit line chart */}
-            <div className="bg-white rounded-2xl p-6 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white">
-              <h3 className="text-sm font-bold text-[#0A0A0A] mb-1" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Monthly Profit — {year}</h3>
-              <p className="text-xs text-[#9A9A9A] mb-4">Net profit trend</p>
-              {loading ? <div className="h-52 bg-[#F5F5F5] rounded-xl animate-pulse" /> : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={monthly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" vertical={false} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
-                    <Tooltip content={<CT />} />
-                    <Bar dataKey="profit" name="Profit" shape={<RBar />}
-                      fill="#10B981"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+          {/* Full-width Profit bar chart */}
+          <div className="bg-white border border-[#E8E8E8] rounded-2xl p-6">
+            <div className="mb-5">
+              <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Monthly Profit — {year}</h3>
+              <p className="text-[11px] text-[#ABABAB] mt-0.5">Net profit after expenses</p>
             </div>
+            {loading ? <div className="h-64 bg-[#F8F8F8] rounded-xl animate-pulse" /> : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={monthly} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
+                  <CartesianGrid stroke="#F0F0F0" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
+                  <Tooltip content={<CT />} />
+                  <Bar dataKey="profit" name="Profit" shape={<RBar />} fill="#10B981" maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           {/* Monthly table */}
-          <div className="bg-white rounded-2xl shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden">
             <div className="px-6 py-4 border-b border-[#F5F5F5] flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Monthly P&L Breakdown — {year}</h3>
               <div className="flex items-center gap-4 text-xs text-[#9A9A9A]">
@@ -465,7 +467,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Sales table */}
-          <div className="bg-white rounded-2xl shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden">
             <div className="px-6 py-4 border-b border-[#F5F5F5] flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Sales — {periodLabel}</h3>
               <span className="text-xs text-[#9A9A9A] font-medium">{salesRows.length} records · {fmt(totalRev)} total</span>
@@ -520,27 +522,37 @@ export default function ReportsPage() {
       {/* ════════════════════════════════════════════════════════ */}
       {tab === "commission" && (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Commission chart */}
-            <div className="bg-white rounded-2xl p-6 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white">
-              <h3 className="text-sm font-bold text-[#0A0A0A] mb-4" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Commission by Month — {year}</h3>
-              {loading ? <div className="h-52 bg-[#F5F5F5] rounded-xl animate-pulse" /> : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={monthly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" vertical={false} />
+          <div className="space-y-5">
+            {/* Full-width Commission chart */}
+            <div className="bg-white border border-[#E8E8E8] rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Commission by Month — {year}</h3>
+                  <p className="text-[11px] text-[#ABABAB] mt-0.5">TVS · Finance · Insurance stacked</p>
+                </div>
+                <div className="flex items-center gap-4 text-[11px] text-[#ABABAB]">
+                  {[{ c: "#FF4C00", l: "TVS" }, { c: "#3B82F6", l: "Finance" }, { c: "#8B5CF6", l: "Insurance" }].map(x => (
+                    <div key={x.l} className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: x.c }} /><span>{x.l}</span></div>
+                  ))}
+                </div>
+              </div>
+              {loading ? <div className="h-64 bg-[#F8F8F8] rounded-xl animate-pulse" /> : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={monthly} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
+                    <CartesianGrid stroke="#F0F0F0" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
                     <Tooltip content={<CT />} />
-                    <Bar dataKey="tvs_comm" name="TVS" stackId="a" fill="#FF4C00" />
-                    <Bar dataKey="finance_comm" name="Finance" stackId="a" fill="#3B82F6" />
-                    <Bar dataKey="insurance_comm" name="Insurance" stackId="a" fill="#8B5CF6" shape={<RBar />} />
+                    <Bar dataKey="tvs_comm" name="TVS" stackId="a" fill="#FF4C00" maxBarSize={40} />
+                    <Bar dataKey="finance_comm" name="Finance" stackId="a" fill="#3B82F6" maxBarSize={40} />
+                    <Bar dataKey="insurance_comm" name="Insurance" stackId="a" fill="#8B5CF6" maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
 
-            {/* Commission donut */}
-            <div className="bg-white rounded-2xl p-6 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white">
+            {/* Commission breakdown side by side */}
+            <div className="bg-white border border-[#E8E8E8] rounded-2xl p-6">
               <h3 className="text-sm font-bold text-[#0A0A0A] mb-4" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Commission Split — {periodLabel}</h3>
               <div className="flex items-center gap-6">
                 <ResponsiveContainer width={160} height={160}>
@@ -586,7 +598,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Commission per sale table */}
-          <div className="bg-white rounded-2xl shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden">
             <div className="px-6 py-4 border-b border-[#F5F5F5]">
               <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Commission Per Sale — {periodLabel}</h3>
             </div>
@@ -630,57 +642,60 @@ export default function ReportsPage() {
       {/* ════════════════════════════════════════════════════════ */}
       {tab === "expenses" && (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Expense pie */}
-            <div className="bg-white rounded-2xl p-6 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white">
-              <h3 className="text-sm font-bold text-[#0A0A0A] mb-4" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Expense Breakdown — {periodLabel}</h3>
-              {loading ? <div className="h-52 bg-[#F5F5F5] rounded-xl animate-pulse" /> :
-              expCatData.length === 0 ? <div className="flex flex-col items-center justify-center py-10 text-[#ABABAB]"><Wallet className="h-8 w-8 mb-2 opacity-30" /><p className="text-sm">No expenses</p></div> : (
-                <div className="flex items-center gap-5">
-                  <ResponsiveContainer width={160} height={160}>
+          <div className="space-y-5">
+            {/* Full-width Monthly Expenses bar */}
+            <div className="bg-white border border-[#E8E8E8] rounded-2xl p-6">
+              <div className="mb-5">
+                <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Monthly Expenses — {year}</h3>
+                <p className="text-[11px] text-[#ABABAB] mt-0.5">Total outflows by month</p>
+              </div>
+              {loading ? <div className="h-64 bg-[#F8F8F8] rounded-xl animate-pulse" /> : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={monthly} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
+                    <CartesianGrid stroke="#F0F0F0" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
+                    <Tooltip content={<CT />} />
+                    <Bar dataKey="expenses" name="Expenses" fill="#6B7280" shape={<RBar />} maxBarSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Expense breakdown */}
+            {expCatData.length > 0 && (
+              <div className="bg-white border border-[#E8E8E8] rounded-2xl p-6">
+                <div className="mb-5">
+                  <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Expense Breakdown — {periodLabel}</h3>
+                  <p className="text-[11px] text-[#ABABAB] mt-0.5">By category</p>
+                </div>
+                <div className="flex items-center gap-8">
+                  <ResponsiveContainer width={200} height={200}>
                     <PieChart>
-                      <Pie data={expCatData} cx="50%" cy="50%" innerRadius={45} outerRadius={72} dataKey="value" strokeWidth={0} paddingAngle={3}>
+                      <Pie data={expCatData} cx="50%" cy="50%" innerRadius={55} outerRadius={88} dataKey="value" strokeWidth={0} paddingAngle={3}>
                         {expCatData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                       </Pie>
                       <Tooltip formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, ""]} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 grid grid-cols-2 gap-2">
                     {expCatData.map((d, i) => (
-                      <div key={d.name} className="flex items-center gap-2">
+                      <div key={d.name} className="flex items-center gap-2.5 p-3 bg-[#FAFAFA] rounded-xl">
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                        <span className="text-xs text-[#6B6B6B] flex-1 capitalize">{d.name.replace("_"," ")}</span>
-                        <span className="text-xs font-bold text-[#0A0A0A]">Rs. {d.value.toLocaleString()}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] text-[#6B6B6B] capitalize leading-tight">{d.name.replace(/_/g," ")}</p>
+                          <p className="text-[13px] font-bold text-[#0A0A0A]">Rs. {d.value.toLocaleString()}</p>
+                        </div>
                       </div>
                     ))}
-                    <div className="pt-2 border-t border-[#F5F5F5] flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#0A0A0A]">Total</span>
-                      <span className="text-sm font-bold text-[#FF4C00]">{fmt(totalExp)}</span>
-                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Monthly expense bar */}
-            <div className="bg-white rounded-2xl p-6 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white">
-              <h3 className="text-sm font-bold text-[#0A0A0A] mb-4" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Monthly Expenses — {year}</h3>
-              {loading ? <div className="h-52 bg-[#F5F5F5] rounded-xl animate-pulse" /> : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={monthly} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" vertical={false} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
-                    <Tooltip content={<CT />} />
-                    <Bar dataKey="expenses" name="Expenses" fill="#6B7280" shape={<RBar />} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Expenses table */}
-          <div className="bg-white rounded-2xl shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden">
             <div className="px-6 py-4 border-b border-[#F5F5F5] flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Expenses — {periodLabel}</h3>
               <span className="text-xs text-[#9A9A9A]">{expenseRows.length} records · {fmt(totalExp)}</span>
@@ -731,7 +746,7 @@ export default function ReportsPage() {
               { label: "Available", value: inventoryRows.reduce((s,r)=>s+r.available,0), sub: "Ready for sale" },
               { label: "Total Stock Value", value: fmt(inventoryRows.reduce((s,r)=>s+r.stockValue,0)), sub: "Available units" },
             ].map(({ label, value, sub }) => (
-              <div key={label} className="bg-white rounded-2xl p-5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white">
+              <div key={label} className="bg-white rounded-2xl p-5 border border-[#E8E8E8]">
                 <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-widest mb-2">{label}</p>
                 <p className="text-2xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
                 <p className="text-xs text-[#ABABAB] mt-1">{sub}</p>
@@ -740,7 +755,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Stacked bar by model */}
-          <div className="bg-white rounded-2xl p-6 shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white">
+          <div className="bg-white rounded-2xl p-6 border border-[#E8E8E8]">
             <h3 className="text-sm font-bold text-[#0A0A0A] mb-4" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Stock by Model</h3>
             {loading ? <div className="h-52 bg-[#F5F5F5] rounded-xl animate-pulse" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -759,7 +774,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Inventory table */}
-          <div className="bg-white rounded-2xl shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-white overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden">
             <div className="px-6 py-4 border-b border-[#F5F5F5]">
               <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Inventory by Model</h3>
             </div>
