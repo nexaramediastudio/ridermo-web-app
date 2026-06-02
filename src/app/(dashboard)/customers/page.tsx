@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, X, Users, UserPlus, TrendingUp, ChevronRight, Phone, CreditCard, MapPin } from "lucide-react";
+import { Plus, Search, X, Users, UserPlus, TrendingUp, Trash2, Phone, CreditCard, MapPin } from "lucide-react";
 
 interface CustomerRow {
   id: string;
@@ -34,6 +34,14 @@ export default function CustomersPage() {
   }, []);
 
   useEffect(() => { loadCustomers(); }, [loadCustomers]);
+
+  async function deleteCustomer(id: string, name: string) {
+    if (!window.confirm(`Delete customer "${name}"? This cannot be undone.`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("customers").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Customer deleted"); loadCustomers(); }
+  }
 
   const filtered = customers.filter((c) => {
     if (!search) return true;
@@ -182,8 +190,12 @@ export default function CustomersPage() {
                     </span>
                   </td>
                   <td className="r-td">
-                    <button className="opacity-0 group-hover:opacity-100 h-7 w-7 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5] transition-all">
-                      <ChevronRight className="h-3.5 w-3.5 text-[#9A9A9A]" />
+                    <button
+                      onClick={() => deleteCustomer(c.id, c.full_name)}
+                      className="opacity-0 group-hover:opacity-100 h-7 w-7 flex items-center justify-center rounded-lg hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                      title="Delete customer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </td>
                 </tr>

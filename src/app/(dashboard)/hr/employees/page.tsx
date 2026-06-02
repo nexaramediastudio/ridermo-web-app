@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   Plus, Search, User, Phone, CreditCard, Briefcase,
-  X, ChevronRight, UserCheck, UserX, Star,
+  X, UserCheck, UserX, Star, Trash2,
 } from "lucide-react";
 
 interface Employee {
@@ -56,6 +56,14 @@ export default function EmployeesPage() {
 
   const active = employees.filter((e) => e.is_active).length;
   const directors = employees.filter((e) => e.type === "director").length;
+
+  async function deleteEmployee(id: string, name: string) {
+    if (!window.confirm(`Delete employee "${name}"? This cannot be undone.`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("employees").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Employee deleted"); loadEmployees(); }
+  }
 
   async function toggleStatus(id: string, current: boolean) {
     const supabase = createClient();
@@ -213,8 +221,12 @@ export default function EmployeesPage() {
                     <span className="flex items-center justify-center gap-1"><UserCheck className="h-3.5 w-3.5" /> Activate</span>
                   )}
                 </button>
-                <button className="h-8 w-8 flex items-center justify-center rounded-lg bg-[#F5F5F5] hover:bg-[#FF4C00]/10 hover:text-[#FF4C00] transition-all">
-                  <ChevronRight className="h-4 w-4" />
+                <button
+                  onClick={() => deleteEmployee(emp.id, emp.full_name)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                  title="Delete employee"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>

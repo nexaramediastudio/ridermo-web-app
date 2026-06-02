@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, Wallet, X, ChevronLeft, ChevronRight, Receipt, TrendingDown } from "lucide-react";
+import { Plus, Search, Wallet, X, ChevronLeft, ChevronRight, Receipt, TrendingDown, Trash2 } from "lucide-react";
 
 type ExpenseCategory = "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "other";
 
@@ -56,6 +56,14 @@ export default function ExpensesPage() {
   }, [month, year]);
 
   useEffect(() => { loadExpenses(); }, [loadExpenses]);
+
+  async function deleteExpense(id: string, desc: string) {
+    if (!window.confirm(`Delete expense "${desc}"?`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("expenses").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Expense deleted"); loadExpenses(); }
+  }
 
   function changeMonth(delta: number) {
     let m = month + delta;
@@ -196,6 +204,7 @@ export default function ExpensesPage() {
               <th className="r-th">Description</th>
               <th className="r-th">Notes</th>
               <th className="r-th text-right">Amount</th>
+              <th className="r-th w-10"></th>
             </tr>
           </thead>
           <tbody>
@@ -223,7 +232,7 @@ export default function ExpensesPage() {
               filtered.map((exp) => {
                 const cfg = CATEGORY_CONFIG[exp.category];
                 return (
-                  <tr key={exp.id} className="r-tr">
+                  <tr key={exp.id} className="r-tr group">
                     <td className="r-td">
                       <span className="text-[12px] text-[#6B6B6B]">
                         {new Date(exp.expense_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
@@ -237,6 +246,15 @@ export default function ExpensesPage() {
                     </td>
                     <td className="r-td">
                       {exp.notes && <span className="text-[11px] text-[#9A9A9A] italic">{exp.notes}</span>}
+                    </td>
+                    <td className="r-td w-10">
+                      <button
+                        onClick={() => deleteExpense(exp.id, exp.description)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                     <td className="r-td text-right">
                       <span className="text-[13px] font-bold text-[#0A0A0A]">

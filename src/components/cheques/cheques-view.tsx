@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   Plus, Search, CreditCard, AlertTriangle,
-  CheckCircle2, XCircle, Clock, X, DollarSign, TrendingUp,
+  CheckCircle2, XCircle, Clock, X, DollarSign, TrendingUp, Trash2,
 } from "lucide-react";
 
 type ChequeStatus = "pending" | "successful" | "returned";
@@ -90,6 +90,14 @@ export function ChequesView({ type }: { type: ChequeType }) {
   const totalPending  = cheques.filter((c) => c.status === "pending").reduce((s, c) => s + c.amount, 0);
   const totalCleared  = cheques.filter((c) => c.status === "successful").reduce((s, c) => s + c.amount, 0);
   const returnedCount = cheques.filter((c) => c.status === "returned").length;
+
+  async function deleteCheque(id: string, num: string) {
+    if (!window.confirm(`Delete cheque ${num}?`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("cheques").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Cheque deleted"); loadCheques(); }
+  }
 
   async function updateStatus(id: string, status: ChequeStatus) {
     const supabase = createClient();
@@ -198,8 +206,9 @@ export function ChequesView({ type }: { type: ChequeType }) {
                 <th className="r-th">Payment Date</th>
                 <th className="r-th text-right">Amount</th>
                 <th className="r-th">Status</th>
-                <th className="r-th">Actions</th>
-              </tr>
+              <th className="r-th">Actions</th>
+              <th className="r-th w-10"></th>
+            </tr>
             </thead>
             <tbody>
               {loading ? (
@@ -227,7 +236,7 @@ export function ChequesView({ type }: { type: ChequeType }) {
                   const sc = STATUS_CONFIG[cheque.status];
                   const isUrgent = cheque.status === "pending" && cheque.payment_date && daysDiff(cheque.payment_date) <= 3;
                   return (
-                    <tr key={cheque.id} className="r-tr">
+                    <tr key={cheque.id} className="r-tr group">
                       <td className="r-td">
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-bold text-[#FF4C00] font-mono">{cheque.cheque_number}</span>
@@ -265,7 +274,7 @@ export function ChequesView({ type }: { type: ChequeType }) {
                         </span>
                       </td>
                       <td className="r-td">
-                        {cheque.status === "pending" && (
+                        {cheque.status === "pending" ? (
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => updateStatus(cheque.id, "successful")}
@@ -280,7 +289,16 @@ export function ChequesView({ type }: { type: ChequeType }) {
                               <XCircle className="h-3 w-3" /> Return
                             </button>
                           </div>
-                        )}
+                        ) : null}
+                      </td>
+                      <td className="r-td">
+                        <button
+                          onClick={() => deleteCheque(cheque.id, cheque.cheque_number)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                          title="Delete cheque"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </td>
                     </tr>
                   );

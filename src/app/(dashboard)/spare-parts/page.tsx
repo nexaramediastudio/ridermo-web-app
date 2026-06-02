@@ -100,6 +100,13 @@ export default function SparePartsPage() {
     load();
   };
 
+  const deletePart = async (p: SparePart) => {
+    if (!window.confirm(`Delete "${p.name}"?`)) return;
+    const { error } = await createClient().from("spare_parts").delete().eq("id", p.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Part deleted"); load(); }
+  };
+
   const toggleActive = async (p: SparePart) => {
     const { error } = await createClient().from("spare_parts").update({ is_active: !p.is_active }).eq("id", p.id);
     if (error) { toast.error(error.message); return; }
@@ -216,6 +223,9 @@ export default function SparePartsPage() {
                       </button>
                       <button onClick={() => toggleActive(p)} className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${p.is_active ? "bg-emerald-50 hover:bg-emerald-100" : "bg-[#F5F5F5] hover:bg-[#EBEBEB]"}`}>
                         {p.is_active ? <ToggleRight className="h-3.5 w-3.5 text-emerald-600" /> : <ToggleLeft className="h-3.5 w-3.5 text-[#9A9A9A]" />}
+                      </button>
+                      <button onClick={() => deletePart(p)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-red-50 text-[#ABABAB] hover:text-red-500 transition-colors" title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>

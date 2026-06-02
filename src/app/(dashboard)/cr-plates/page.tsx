@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Hash, Search, CheckCircle2, Clock, FileCheck, AlertTriangle } from "lucide-react";
+import { Hash, Search, CheckCircle2, Clock, FileCheck, AlertTriangle, Trash2 } from "lucide-react";
 
 type TrackStatus = "pending" | "received" | "collected";
 
@@ -81,6 +81,14 @@ export default function CRPlatesPage() {
   const pendingCR = records.filter((r) => r.cr_status === "pending").length;
   const pendingPlate = records.filter((r) => r.plate_status === "pending").length;
   const completedBoth = records.filter((r) => r.cr_status === "collected" && r.plate_status === "collected").length;
+
+  async function deleteCRRecord(id: string) {
+    if (!window.confirm("Delete this CR & Plate record?")) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("cr_plate_tracking").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Record deleted"); loadRecords(); }
+  }
 
   async function updateStatus(id: string, field: "cr_status" | "plate_status", value: TrackStatus, extraField?: string, extraValue?: string) {
     setUpdating(id + field);
@@ -179,6 +187,7 @@ export default function CRPlatesPage() {
                 <th className="r-th">CR Status</th>
                 <th className="r-th">Plate No.</th>
                 <th className="r-th">Plate Status</th>
+                <th className="r-th w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -202,7 +211,7 @@ export default function CRPlatesPage() {
                 </tr>
               ) : (
                 filtered.map((rec) => (
-                  <tr key={rec.id} className="r-tr">
+                  <tr key={rec.id} className="r-tr group">
                     <td className="r-td">
                       <span className="text-[13px] font-bold text-[#FF4C00]">
                         {rec.sales?.invoice_number || "—"}
@@ -257,6 +266,15 @@ export default function CRPlatesPage() {
                         <option value="received">Received</option>
                         <option value="collected">Collected</option>
                       </select>
+                    </td>
+                    <td className="r-td">
+                      <button
+                        onClick={() => deleteCRRecord(rec.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                        title="Delete record"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))

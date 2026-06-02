@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   Plus, Search, X, Pencil, AlertTriangle, ShoppingBag,
-  ToggleLeft, ToggleRight, TrendingUp, Package,
+  ToggleLeft, ToggleRight, TrendingUp, Package, Trash2,
 } from "lucide-react";
 
 type AccCategory =
@@ -103,6 +103,13 @@ export default function AccessoriesPage() {
     setSaving(false);
     setShowModal(false);
     load();
+  };
+
+  const deleteItem = async (a: Accessory) => {
+    if (!window.confirm(`Delete "${a.name}"?`)) return;
+    const { error } = await createClient().from("accessories").delete().eq("id", a.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Accessory deleted"); load(); }
   };
 
   const toggleActive = async (a: Accessory) => {
@@ -245,6 +252,9 @@ export default function AccessoriesPage() {
                         </button>
                         <button onClick={() => toggleActive(a)} className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${a.is_active ? "bg-emerald-50 hover:bg-emerald-100" : "bg-[#F5F5F5] hover:bg-[#EBEBEB]"}`}>
                           {a.is_active ? <ToggleRight className="h-3.5 w-3.5 text-emerald-600" /> : <ToggleLeft className="h-3.5 w-3.5 text-[#9A9A9A]" />}
+                        </button>
+                        <button onClick={() => deleteItem(a)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-red-50 text-[#ABABAB] hover:text-red-500 transition-colors" title="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>

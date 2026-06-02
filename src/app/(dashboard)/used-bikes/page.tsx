@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   Plus, Search, X, ChevronDown, Bike, Tag, Gauge,
   Calendar, Pencil, CheckCircle2, AlertCircle, Clock,
-  Package, TrendingUp,
+  Package, TrendingUp, Trash2,
 } from "lucide-react";
 
 type Condition = "excellent" | "good" | "fair" | "poor";
@@ -111,6 +111,13 @@ export default function UsedBikesPage() {
     setSaving(false);
     setShowModal(false);
     load();
+  };
+
+  const deleteBike = async (b: UsedBike) => {
+    if (!window.confirm(`Delete "${b.make} ${b.model_name}"?`)) return;
+    const { error } = await createClient().from("used_bikes").delete().eq("id", b.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Bike deleted"); load(); }
   };
 
   const markSold = async (id: string) => {
@@ -231,6 +238,9 @@ export default function UsedBikesPage() {
                     )}
                     <button onClick={() => openEdit(b)} className="h-7 w-7 rounded-lg bg-[#F5F5F5] flex items-center justify-center hover:bg-[#EBEBEB] transition-colors">
                       <Pencil className="h-3.5 w-3.5 text-[#6B6B6B]" />
+                    </button>
+                    <button onClick={() => deleteBike(b)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-red-50 text-[#ABABAB] hover:text-red-500 transition-colors" title="Delete">
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </td>

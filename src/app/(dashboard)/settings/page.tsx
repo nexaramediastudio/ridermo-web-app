@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   Building2, Shield, Users, Settings2, Bike,
-  Plus, X, Edit2, Check, Save,
+  Plus, X, Edit2, Check, Save, Trash2,
   Phone, Mail, MapPin, Globe, Key,
   Zap, Fuel, ChevronDown, ChevronUp, Palette,
 } from "lucide-react";
@@ -161,6 +161,14 @@ function CompanyList({ tableName, title, subtitle }: { tableName: "finance_compa
     load();
   }
 
+  async function deleteCompany(id: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.from(tableName).delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Company deleted"); load(); }
+  }
+
   return (
     <div className="space-y-4 max-w-2xl">
       <div className="flex items-center justify-between">
@@ -237,6 +245,13 @@ function CompanyList({ tableName, title, subtitle }: { tableName: "finance_compa
                       className={`text-[10px] font-bold px-2 py-1 rounded-lg ${company.is_active ? "bg-[#F5F5F5] text-[#6B6B6B] hover:bg-red-50 hover:text-red-600" : "bg-emerald-50 text-emerald-700"} transition-all`}
                     >
                       {company.is_active ? "Deactivate" : "Activate"}
+                    </button>
+                    <button
+                      onClick={() => deleteCompany(company.id, company.name)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>

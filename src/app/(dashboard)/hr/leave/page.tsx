@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   Plus, X, Umbrella, CheckCircle2, XCircle,
-  Clock, Users, CalendarDays, Search,
+  Clock, Users, CalendarDays, Search, Trash2,
 } from "lucide-react";
 
 interface LeaveRequest {
@@ -89,6 +89,14 @@ export default function LeavePage() {
       loadData();
     }
     setSaving(false);
+  }
+
+  async function deleteLeave(id: string) {
+    if (!window.confirm("Delete this leave request?")) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("leaves").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Leave request deleted"); loadData(); }
   }
 
   async function updateStatus(id: string, status: "approved" | "rejected") {
@@ -186,6 +194,7 @@ export default function LeavePage() {
               <th className="r-th">Requested</th>
               <th className="r-th">Status</th>
               <th className="r-th">Actions</th>
+              <th className="r-th w-10"></th>
             </tr>
           </thead>
           <tbody>
@@ -217,7 +226,7 @@ export default function LeavePage() {
               filtered.map((leave) => {
                 const sc = STATUS_CONFIG[leave.status];
                 return (
-                  <tr key={leave.id} className="r-tr">
+                  <tr key={leave.id} className="r-tr group">
                     <td className="r-td">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0">
@@ -262,7 +271,7 @@ export default function LeavePage() {
                       <span className={sc.badge}>{sc.label}</span>
                     </td>
                     <td className="r-td">
-                      {leave.status === "pending" && (
+                        {leave.status === "pending" ? (
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => updateStatus(leave.id, "approved")}
@@ -277,7 +286,16 @@ export default function LeavePage() {
                             <XCircle className="h-3 w-3" /> Reject
                           </button>
                         </div>
-                      )}
+                      ) : null}
+                    </td>
+                    <td className="r-td">
+                      <button
+                        onClick={() => deleteLeave(leave.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                        title="Delete leave request"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </tr>
                 );

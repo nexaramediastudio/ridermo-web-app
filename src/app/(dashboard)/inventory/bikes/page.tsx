@@ -11,7 +11,7 @@ import {
   Download,
   Bike,
   ChevronDown,
-  MoreHorizontal,
+  Trash2,
   X,
   AlertCircle,
   PackagePlus,
@@ -67,6 +67,14 @@ export default function InventoryBikesPage() {
     else setBikes(data || []);
     setLoading(false);
   }, [statusFilter, searchQuery]);
+
+  async function deleteBike(id: string, roundNum: string) {
+    if (!window.confirm(`Delete bike ${roundNum}? This cannot be undone.`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("inventory_bikes").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success(`Bike ${roundNum} deleted`); loadBikes(); }
+  }
 
   const loadModels = useCallback(async () => {
     const supabase = createClient();
@@ -273,8 +281,12 @@ export default function InventoryBikesPage() {
                       </span>
                     </td>
                     <td className="r-td">
-                      <button className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[#F0F0F0] transition-all">
-                        <MoreHorizontal className="h-4 w-4 text-[#6B6B6B]" />
+                      <button
+                        onClick={() => deleteBike(bike.id, bike.round_number)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                        title="Delete bike"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </td>
                   </tr>
