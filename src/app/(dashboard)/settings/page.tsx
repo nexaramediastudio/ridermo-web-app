@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   Building2, Shield, Users, Settings2, Bike,
-  Plus, X, Edit2, Check, Save, Trash2,
+  Plus, X, Edit2, Check, Save, Trash2, Search,
   Phone, Mail, MapPin, Globe, Key,
   Zap, Fuel, ChevronDown, ChevronUp, Palette,
 } from "lucide-react";
@@ -735,6 +735,132 @@ function BikeModelsSettings() {
   );
 }
 
+// ─── Inventory Bikes Manager ───────────────────────────────────────────────────
+const INV_STATUS_LABELS: Record<string, string> = { available: "Available", sold: "Sold", reserved: "Reserved", service: "Service" };
+const INV_STATUS_COLORS: Record<string, string> = {
+  available: "bg-emerald-50 text-emerald-700",
+  sold: "bg-[#F5F5F5] text-[#6B6B6B]",
+  reserved: "bg-amber-50 text-amber-700",
+  service: "bg-blue-50 text-blue-700",
+};
+
+type InvBike = { id: string; round_number: string; status: string; stock_date: string; bike_models: { name: string } | null };
+
+function InventoryBikesSettings() {
+  const [bikes, setBikes] = useState<InvBike[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("inventory_bikes")
+      .select("id, round_number, status, stock_date, bike_models(name)")
+      .order("stock_date", { ascending: false });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setBikes((data || []) as unknown as InvBike[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function deleteBike(id: string, roundNum: string) {
+    if (!window.confirm(`Remove bike ${roundNum} from inventory? This cannot be undone.`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("inventory_bikes").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success(`Bike ${roundNum} removed`); load(); }
+  }
+
+  const filtered = bikes.filter((b) => {
+    const s = search.toLowerCase();
+    return !s || b.round_number.toLowerCase().includes(s) || (b.bike_models?.name || "").toLowerCase().includes(s) || b.status.includes(s);
+  });
+
+  return (
+    <div className="space-y-4 mt-8 pt-8 border-t border-[#F0F0F0]">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+            Inventory Bikes
+          </h3>
+          <p className="text-sm text-[#9A9A9A] mt-0.5">View and remove bikes from inventory stock</p>
+        </div>
+        <span className="text-xs font-semibold text-[#ABABAB] bg-[#F5F5F5] px-3 py-1.5 rounded-lg">
+          {bikes.length} total · {bikes.filter(b => b.status === "available").length} available
+        </span>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#ABABAB]" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by round number or model…"
+          className="w-full h-9 pl-9 pr-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white"
+        />
+      </div>
+
+      <div className="border border-[#F0F0F0] rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[#F0F0F0] bg-[#FAFAFA]">
+              <th className="px-4 py-2.5 text-left text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider">Round #</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider">Model</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider">Stock Date</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider">Status</th>
+              <th className="px-4 py-2.5 w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-[#F5F5F5]">
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <td key={j} className="px-4 py-3"><div className="h-4 bg-[#F0F0F0] rounded animate-pulse" /></td>
+                  ))}
+                </tr>
+              ))
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-[#ABABAB]">
+                  {search ? "No bikes match your search" : "No bikes in inventory"}
+                </td>
+              </tr>
+            ) : (
+              filtered.map((bike) => (
+                <tr key={bike.id} className="border-b border-[#F5F5F5] last:border-0 hover:bg-[#FAFAFA] group transition-colors">
+                  <td className="px-4 py-3 font-mono font-bold text-[#FF4C00] text-xs">{bike.round_number}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-[#0A0A0A]">{bike.bike_models?.name || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-[#6B6B6B]">
+                    {new Date(bike.stock_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${INV_STATUS_COLORS[bike.status] || "bg-[#F5F5F5] text-[#6B6B6B]"}`}>
+                      {INV_STATUS_LABELS[bike.status] || bike.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => deleteBike(bike.id, bike.round_number)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                      title="Remove bike"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("company");
@@ -775,7 +901,12 @@ export default function SettingsPage() {
         {/* Content */}
         <div className="flex-1 r-card p-6">
           {activeTab === "company" && <CompanySettings />}
-          {activeTab === "bikes" && <BikeModelsSettings />}
+          {activeTab === "bikes" && (
+            <>
+              <BikeModelsSettings />
+              <InventoryBikesSettings />
+            </>
+          )}
           {activeTab === "finance" && (
             <CompanyList
               tableName="finance_companies"
