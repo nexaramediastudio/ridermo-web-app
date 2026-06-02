@@ -78,23 +78,21 @@ function KPI({ label, value, sub, trend, color, icon: Icon }: {
   color: string; icon: React.ElementType;
 }) {
   return (
-    <div className="bg-white border border-[#E8E8E8] rounded-xl px-4 py-3 flex items-center justify-between gap-3 hover:border-[#D0D0D0] transition-colors">
-      <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
-          <Icon style={{ width: 16, height: 16 }} />
+    <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5 hover:border-[#D5D5D5] transition-colors" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03)" }}>
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color}`}>
+          <Icon style={{ width: 17, height: 17 }} />
         </div>
-        <div>
-          <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{label}</p>
-          <p className="text-[17px] font-bold text-[#0A0A0A] leading-tight tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
-          {sub && <p className="text-[10px] text-[#ABABAB]">{sub}</p>}
-        </div>
+        {trend && (
+          <span className={`flex items-center gap-0.5 text-[10px] font-bold px-2 py-1 rounded-lg ${trend.up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
+            {trend.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+            {trend.v}
+          </span>
+        )}
       </div>
-      {trend && (
-        <span className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${trend.up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
-          {trend.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-          {trend.v}
-        </span>
-      )}
+      <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-[26px] font-bold text-[#0A0A0A] leading-none tracking-tight tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
+      {sub && <p className="text-[11px] text-[#ABABAB] mt-1.5">{sub}</p>}
     </div>
   );
 }
@@ -294,7 +292,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Area chart */}
-        <div className="lg:col-span-2 bg-white border border-[#E8E8E8] rounded-2xl p-5">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#EBEBEB] p-5">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Revenue Analytics</h3>
@@ -343,7 +341,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Donut */}
-        <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5 flex flex-col">
+        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5 flex flex-col">
           <SH title="Sales Distribution" sub="By payment type" />
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="relative">
@@ -378,7 +376,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Monthly bar */}
-        <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5">
+        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
           <SH title="Monthly Performance" sub="Last 6 months" href="/reports" action="Full Report" />
           <ResponsiveContainer width="100%" height={170}>
             <BarChart data={data.monthlySales} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -393,7 +391,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Commission */}
-        <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5">
+        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
           <SH title="Commission Breakdown" sub="This month" href="/finance" action="Finance" />
           <div className="space-y-3">
             {[
@@ -426,7 +424,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Attendance */}
-        <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5">
+        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
           <SH title="Today's Attendance" sub={`${data.totalEmployees} total employees`} href="/hr/attendance" action="Mark" />
           <div className="flex items-center gap-5">
             <div className="relative w-20 h-20 flex-shrink-0">
@@ -464,7 +462,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Recent Sales */}
-        <div className="lg:col-span-2 bg-white border border-[#E8E8E8] rounded-2xl overflow-hidden">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden">
           <div className="px-5 py-4 border-b border-[#F0F0F0] flex items-center justify-between">
             <div>
               <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Recent Sales</h3>
@@ -509,7 +507,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Pending */}
-        <div className="bg-white border border-[#E8E8E8] rounded-2xl overflow-hidden">
+        <div className="bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden">
           <div className="px-5 py-4 border-b border-[#F0F0F0]">
             <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Pending Actions</h3>
             <p className="text-[11px] text-[#ABABAB] mt-0.5">Items needing attention</p>
@@ -543,7 +541,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Inventory Overview ───────────────────────────────── */}
-      <div className="bg-white border border-[#E8E8E8] rounded-2xl overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden">
         <div className="px-5 py-4 border-b border-[#F0F0F0] flex items-center justify-between">
           <div>
             <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Inventory Overview</h3>
@@ -610,7 +608,7 @@ export default function DashboardPage() {
         ].map(({ label, current, prev, accent }) => {
           const diff = prev > 0 ? ((current - prev) / prev) * 100 : null;
           return (
-            <div key={label} className="bg-white border border-[#E8E8E8] rounded-2xl p-5">
+            <div key={label} className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[11px] font-bold text-[#9A9A9A] uppercase tracking-wider">{label}</span>
                 {diff !== null && (
@@ -634,7 +632,7 @@ export default function DashboardPage() {
 
       {/* ── Reminders Timeline ───────────────────────────────── */}
       {data.reminders.length > 0 && (
-        <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5">
+        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
           <SH title="Upcoming Reminders" sub="Cheques and actions due soon" href="/finance" action="View All" />
           <div className="relative space-y-3 pl-8">
             <div className="absolute left-3 top-0 bottom-0 w-px bg-[#F0F0F0]" />
@@ -670,7 +668,7 @@ function Skeleton() {
         <div className="space-y-2"><div className="h-3 w-48 bg-[#EBEBEB] rounded" /><div className="h-7 w-64 bg-[#EBEBEB] rounded-lg" /></div>
         <div className="h-9 w-28 bg-[#EBEBEB] rounded-xl" />
       </div>
-      <div className="grid grid-cols-4 gap-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 bg-white border border-[#EBEBEB] rounded-xl" />)}</div>
+      <div className="grid grid-cols-4 gap-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 bg-white border border-[#EBEBEB] rounded-2xl" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }} />)}</div>
       <div className="grid grid-cols-3 gap-4"><div className="col-span-2 h-72 bg-white border border-[#EBEBEB] rounded-2xl" /><div className="h-72 bg-white border border-[#EBEBEB] rounded-2xl" /></div>
       <div className="grid grid-cols-3 gap-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-52 bg-white border border-[#EBEBEB] rounded-2xl" />)}</div>
     </div>
