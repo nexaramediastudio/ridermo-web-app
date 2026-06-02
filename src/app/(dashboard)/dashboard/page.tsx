@@ -71,6 +71,16 @@ function RBar(props: { x?: number; y?: number; width?: number; height?: number; 
   return <path d={`M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} Z`} fill={fill} />;
 }
 
+// ─── Week bar (last bar = today, orange) ──────────────────────────
+function WeekBar(props: { x?: number; y?: number; width?: number; height?: number; index?: number; totalBars?: number }) {
+  const { x = 0, y = 0, width = 0, height = 0, index = 0, totalBars = 7 } = props;
+  if (!height || height <= 0) return <g />;
+  const isToday = index === totalBars - 1;
+  const fill = isToday ? "#FF4C00" : "#BFDBFE";
+  const r = Math.min(5, width / 2);
+  return <path d={`M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} Z`} fill={fill} />;
+}
+
 // ─── KPI Card ─────────────────────────────────────────────────────
 function KPI({ label, value, sub, trend, color, icon: Icon }: {
   label: string; value: string; sub?: string;
@@ -249,413 +259,355 @@ export default function DashboardPage() {
   if (!data) return null;
 
   const profit = data.monthRevenue - data.monthExpenses;
-  const revData = revRange === "7d" ? data.revenueSeries.slice(-7) : data.revenueSeries;
+  const revData = data.revenueSeries;
   const attPct = data.totalEmployees > 0 ? Math.round((data.presentToday / data.totalEmployees) * 100) : 0;
-  const circ = 2 * Math.PI * 30;
+
+  const monthPct = data.monthCount > 0 ? Math.min(Math.round((data.monthCount / 30) * 100), 100) : 0;
+  const weekData = data.revenueSeries.slice(-7);
 
   return (
-    <div className="space-y-5 max-w-[1600px] pb-8">
+    <div className="pb-8 max-w-[1600px]">
+      <div className="flex gap-5 items-start">
 
-      {/* ── Hero row ───────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[11px] text-[#ABABAB] font-semibold uppercase tracking-widest mb-1">
-            {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </p>
-          <h1 className="text-2xl font-bold text-[#0A0A0A] tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-            {greeting()}, {data.userName} 👋
-          </h1>
-        </div>
-        <Link href="/sales/new" className="flex items-center gap-2 h-9 px-4 bg-[#FF4C00] text-white text-[13px] font-semibold rounded-xl hover:bg-[#E04400] transition-colors">
-          <Zap className="h-3.5 w-3.5" /> New Sale
-        </Link>
-      </div>
+        {/* ═══ LEFT — main content ═══ */}
+        <div className="flex-1 min-w-0 space-y-5">
 
-      {/* ── KPI Cards ──────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="Today's Sales" value={`Rs. ${fmt(data.todaySales)}`}
-          sub={`${data.todayCount} sale${data.todayCount !== 1 ? "s" : ""} today`}
-          icon={DollarSign} color="bg-[#FF4C00] text-white" />
-        <KPI label="Monthly Revenue" value={`Rs. ${fmt(data.monthRevenue)}`}
-          sub={`${data.monthCount} sales this month`}
-          icon={TrendingUp} color="bg-[#0A0A0A] text-white" />
-        <KPI label="Net Profit" value={`Rs. ${fmt(Math.abs(profit))}`}
-          sub={profit >= 0 ? "Profitable this month" : "Net loss this month"}
-          trend={profit > 0 ? { v: "Profitable", up: true } : profit < 0 ? { v: "Loss", up: false } : null}
-          icon={Receipt} color={profit >= 0 ? "bg-emerald-500 text-white" : "bg-red-400 text-white"} />
-        <KPI label="Stock Value" value={`Rs. ${fmt(data.stockValue)}`}
-          sub="Available inventory value"
-          icon={Package} color="bg-[#F5F5F5] text-[#6B6B6B]" />
-      </div>
-
-      {/* ── Revenue chart + Donut ───────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        {/* Area chart */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#EBEBEB] p-5">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Revenue Analytics</h3>
-              <p className="text-[11px] text-[#ABABAB] mt-0.5">Revenue · Expenses · Profit</p>
-            </div>
-            <div className="flex items-center gap-1 bg-[#F5F5F5] rounded-lg p-0.5">
-              {(["7d", "30d"] as const).map(r => (
-                <button key={r} onClick={() => setRevRange(r)}
-                  className={`h-6 px-2.5 rounded-md text-[11px] font-semibold transition-all ${revRange === r ? "bg-white text-[#0A0A0A]" : "text-[#9A9A9A]"}`}>
-                  {r === "7d" ? "7D" : "30D"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={revData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gR" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#FF4C00" stopOpacity={0.12} />
-                  <stop offset="95%" stopColor="#FF4C00" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.12} />
-                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="#F0F0F0" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false}
-                interval={revRange === "30d" ? 5 : 0} />
-              <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false}
-                tickFormatter={v => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : `${v}`} />
-              <Tooltip content={<CT />} />
-              <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#FF4C00" strokeWidth={2} fill="url(#gR)" />
-              <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#D0D0D0" strokeWidth={1.5} fill="none" strokeDasharray="4 2" />
-              <Area type="monotone" dataKey="profit" name="Profit" stroke="#10B981" strokeWidth={2} fill="url(#gP)" />
-            </AreaChart>
-          </ResponsiveContainer>
-          <div className="flex items-center gap-5 pt-3 mt-3 border-t border-[#F5F5F5]">
-            {[{ c: "#FF4C00", l: "Revenue" }, { c: "#D0D0D0", l: "Expenses" }, { c: "#10B981", l: "Profit" }].map(x => (
-              <div key={x.l} className="flex items-center gap-1.5">
-                <span className="w-3 h-[2px] rounded" style={{ background: x.c }} />
-                <span className="text-[11px] text-[#9A9A9A] font-medium">{x.l}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Donut */}
-        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5 flex flex-col">
-          <SH title="Sales Distribution" sub="By payment type" />
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <div className="relative">
-              <ResponsiveContainer width={160} height={160}>
-                <PieChart>
-                  <Pie data={data.salesDist} cx="50%" cy="50%" innerRadius={48} outerRadius={72}
-                    dataKey="value" strokeWidth={0} paddingAngle={3}>
-                    {data.salesDist.map((e, i) => <Cell key={i} fill={e.color} />)}
-                  </Pie>
-                  <Tooltip formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, ""]} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <p className="text-[10px] text-[#ABABAB] font-medium">Total</p>
-                <p className="text-[15px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Rs. {fmt(data.monthRevenue)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2 pt-2 border-t border-[#F5F5F5]">
-            {data.salesDist.filter(d => d.name !== "No Sales").map(d => (
-              <div key={d.name} className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.color }} />
-                <span className="text-[11px] text-[#6B6B6B] flex-1">{d.name}</span>
-                <span className="text-[11px] font-bold text-[#0A0A0A]">Rs. {d.value.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Bar + Commission + Attendance ───────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        {/* Monthly bar */}
-        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
-          <SH title="Monthly Performance" sub="Last 6 months" href="/reports" action="Full Report" />
-          <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={data.monthlySales} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-              <CartesianGrid stroke="#F0F0F0" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false}
-                tickFormatter={v => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : `${v}`} />
-              <Tooltip cursor={{ fill: "#F9F9F9" }} formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, "Sales"]} />
-              <Bar dataKey="sales" fill="#FF4C00" shape={<RBar />} maxBarSize={32} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Commission */}
-        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
-          <SH title="Commission Breakdown" sub="This month" href="/finance" action="Finance" />
-          <div className="space-y-3">
-            {[
-              { label: "TVS Commission", value: data.tvsCommission, color: "#FF4C00", bg: "bg-[#FF4C00]/8" },
-              { label: "Finance Commission", value: data.financeCommission, color: "#3B82F6", bg: "bg-blue-50" },
-              { label: "Insurance Commission", value: data.insuranceCommission, color: "#8B5CF6", bg: "bg-purple-50" },
-            ].map(c => {
-              const total = data.tvsCommission + data.financeCommission + data.insuranceCommission;
-              const pct = total > 0 ? (c.value / total) * 100 : 0;
-              return (
-                <div key={c.label}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
-                      <span className="text-[11px] text-[#6B6B6B] font-medium">{c.label}</span>
-                    </div>
-                    <span className="text-[12px] font-bold text-[#0A0A0A]">Rs. {c.value.toLocaleString()}</span>
-                  </div>
-                  <div className="h-1.5 bg-[#F5F5F5] rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ background: c.color, width: `${pct}%` }} />
-                  </div>
+          {/* ── Hero card (Sales Overview) ── */}
+          <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+            {/* Card header */}
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-[#FFF3EF] flex items-center justify-center">
+                  <ShoppingCart className="h-5 w-5 text-[#FF4C00]" />
                 </div>
-              );
-            })}
-            <div className="pt-2 border-t border-[#F5F5F5] flex items-center justify-between">
-              <span className="text-[11px] text-[#ABABAB] font-medium">Total Commission</span>
-              <span className="text-[13px] font-bold text-[#FF4C00]">Rs. {(data.tvsCommission + data.financeCommission + data.insuranceCommission).toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Attendance */}
-        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
-          <SH title="Today's Attendance" sub={`${data.totalEmployees} total employees`} href="/hr/attendance" action="Mark" />
-          <div className="flex items-center gap-5">
-            <div className="relative w-20 h-20 flex-shrink-0">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 72 72">
-                <circle cx="36" cy="36" r="30" fill="none" stroke="#F0F0F0" strokeWidth="7" />
-                <circle cx="36" cy="36" r="30" fill="none" stroke="#FF4C00" strokeWidth="7"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(attPct / 100) * circ} ${circ}`} />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-[16px] font-bold text-[#0A0A0A]">{attPct}%</span>
+                <div>
+                  <h2 className="text-[18px] font-bold text-[#111827] leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Sales Overview</h2>
+                  <p className="text-[12px] text-[#9CA3AF] mt-0.5">Monitor daily sales and track monthly performance</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-[12px] font-semibold text-[#6B7280] bg-[#F9FAFB] border border-[#E5E7EB] px-3 py-1.5 rounded-lg">
+                <Calendar className="h-3.5 w-3.5" />
+                {new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
               </div>
             </div>
-            <div className="flex-1 space-y-3">
+
+            {/* Big stats + chart side by side */}
+            <div className="flex gap-8 items-end">
+              {/* Left: big numbers */}
+              <div className="flex-shrink-0 w-52 space-y-6">
+                <div>
+                  <div className="flex items-end gap-2">
+                    <span className="text-[56px] font-extrabold text-[#111827] leading-none tracking-tight tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{data.todayCount}</span>
+                    <span className="text-[22px] font-semibold text-[#D1D5DB] mb-1.5">/30</span>
+                  </div>
+                  <p className="text-[12px] text-[#9CA3AF] font-medium mt-1.5">Today&#39;s Sales</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-wider">Rs. {fmt(data.todaySales)}</span>
+                  <p className="text-[11px] text-[#9CA3AF] font-medium">Today&#39;s Revenue</p>
+                </div>
+                <div>
+                  <div className="text-[40px] font-extrabold text-[#111827] leading-none tracking-tight tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{monthPct}%</div>
+                  <p className="text-[12px] text-[#9CA3AF] font-medium mt-1">Monthly Performance</p>
+                </div>
+              </div>
+
+              {/* Right: bar chart */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-wider">Rs. {fmt(data.monthRevenue)} MONTHLY REVENUE</span>
+                  <Link href="/sales/new" className="flex items-center gap-1.5 h-7 px-3 bg-[#FF4C00] text-white text-[11px] font-semibold rounded-lg hover:bg-[#E04400] transition-colors">
+                    <Zap className="h-3 w-3" /> New Sale
+                  </Link>
+                </div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={weekData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barGap={4}>
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={false} formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, "Revenue"]} />
+                    <Bar dataKey="revenue" maxBarSize={28} shape={<WeekBar totalBars={weekData.length} />} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-[#FF4C00]" /><span className="text-[10px] text-[#9CA3AF]">Today</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-[#BFDBFE]" /><span className="text-[10px] text-[#9CA3AF]">This week</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Revenue Snapshot ── */}
+          <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <p className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Revenue Snapshot</p>
+                <div className="flex items-end gap-3">
+                  <span className="text-[40px] font-extrabold text-[#111827] leading-none tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+                    Rs. {fmt(data.monthRevenue)}
+                  </span>
+                  {profit > 0 && (
+                    <span className="flex items-center gap-1 text-[12px] font-bold bg-emerald-50 text-emerald-600 px-2.5 py-1.5 rounded-xl mb-1">
+                      <ArrowUpRight className="h-3.5 w-3.5" /> Profitable
+                    </span>
+                  )}
+                </div>
+                <p className="text-[12px] text-[#9CA3AF] mt-1.5">
+                  {data.monthCount} sales · Expenses: Rs. {fmt(data.monthExpenses)} · Net: <span className={profit >= 0 ? "text-emerald-600 font-semibold" : "text-red-500 font-semibold"}>Rs. {fmt(Math.abs(profit))}</span>
+                </p>
+              </div>
+              <Link href="/reports" className="text-[11px] font-semibold text-[#FF4C00] hover:underline flex items-center gap-1">Full Report <ArrowRight className="h-3 w-3" /></Link>
+            </div>
+
+            {/* Revenue trend area chart */}
+            <ResponsiveContainer width="100%" height={130}>
+              <AreaChart data={revData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#FF4C00" stopOpacity={0.15} />
+                    <stop offset="100%" stopColor="#FF4C00" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9CA3AF" }} axisLine={false} tickLine={false} interval={revRange === "30d" ? 5 : 0} />
+                <Tooltip content={<CT />} />
+                <Area type="monotone" dataKey="revenue" stroke="#FF4C00" strokeWidth={2} fill="url(#gRev)" />
+              </AreaChart>
+            </ResponsiveContainer>
+
+            {/* Commission row */}
+            <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-[#F3F4F6]">
               {[
-                { label: "Present", value: data.presentToday, color: "bg-emerald-400" },
-                { label: "Absent", value: data.absentToday, color: "bg-red-400" },
-                { label: "On Leave", value: data.leaveToday, color: "bg-amber-400" },
-              ].map(s => (
-                <div key={s.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${s.color}`} />
-                    <span className="text-[11px] text-[#6B6B6B]">{s.label}</span>
-                  </div>
-                  <span className="text-[13px] font-bold text-[#0A0A0A]">{s.value}</span>
+                { label: "TVS Commission", value: data.tvsCommission, color: "#FF4C00", bg: "#FFF3EF" },
+                { label: "Finance Commission", value: data.financeCommission, color: "#3B82F6", bg: "#EFF6FF" },
+                { label: "Insurance Commission", value: data.insuranceCommission, color: "#8B5CF6", bg: "#F5F3FF" },
+              ].map(c => (
+                <div key={c.label} className="rounded-xl px-4 py-3" style={{ background: c.bg }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: c.color }}>{c.label}</p>
+                  <p className="text-[18px] font-bold text-[#111827] tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Rs. {fmt(c.value)}</p>
                 </div>
               ))}
-              {data.totalEmployees === 0 && <p className="text-[11px] text-[#ABABAB]">No attendance today</p>}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* ── Recent Sales + Pending Actions ──────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* ── Two cards: Inventory Health + Pending Actions ── */}
+          <div className="grid grid-cols-2 gap-5">
 
-        {/* Recent Sales */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#F0F0F0] flex items-center justify-between">
-            <div>
-              <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Recent Sales</h3>
-              <p className="text-[11px] text-[#ABABAB] mt-0.5">{data.monthCount} sales this month</p>
+            {/* Inventory Health */}
+            <div className="bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+              <div className="px-5 py-4 border-b border-[#F3F4F6] flex items-center justify-between">
+                <div>
+                  <h3 className="text-[14px] font-bold text-[#111827]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Inventory Health</h3>
+                  <p className="text-[11px] text-[#9CA3AF] mt-0.5">Stock by model</p>
+                </div>
+                <Link href="/inventory/bikes" className="text-[11px] font-semibold text-[#FF4C00] flex items-center gap-1 hover:underline">Manage <ArrowRight className="h-3 w-3" /></Link>
+              </div>
+              {data.inventoryByModel.length === 0 ? (
+                <div className="py-10 text-center text-[#9CA3AF]">
+                  <Bike className="h-6 w-6 mx-auto mb-2 text-[#D1D5DB]" />
+                  <p className="text-[12px]">No inventory data</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-[#F9FAFB]">
+                  {data.inventoryByModel.slice(0, 5).map(m => {
+                    const pct = m.total > 0 ? (m.available / m.total) * 100 : 0;
+                    const color = pct > 60 ? "#10B981" : pct > 30 ? "#F59E0B" : "#EF4444";
+                    return (
+                      <div key={m.model} className="flex items-center gap-3 px-5 py-3 hover:bg-[#F9FAFB] transition-colors">
+                        <div className="w-7 h-7 rounded-lg bg-[#FFF3EF] flex items-center justify-center flex-shrink-0">
+                          <Bike className="h-3.5 w-3.5 text-[#FF4C00]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-[#111827] truncate">{m.model}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 h-1 bg-[#F3F4F6] rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ background: color, width: `${Math.max(pct, 2)}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-right flex-shrink-0">
+                          <span className="text-[12px] font-bold text-emerald-600">{m.available}</span>
+                          <span className="text-[11px] text-[#9CA3AF]">/ {m.total}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <Link href="/sales" className="flex items-center gap-1 text-[11px] font-semibold text-[#FF4C00] hover:underline">View all <ArrowRight className="h-3 w-3" /></Link>
-          </div>
-          {data.recentSales.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-14 text-[#D0D0D0]">
-              <ShoppingCart className="h-8 w-8 mb-2" />
-              <p className="text-[12px] font-medium text-[#ABABAB]">No sales yet</p>
-            </div>
-          ) : (
-            <div>
-              <div className="grid grid-cols-[1.2fr_1fr_auto_auto] gap-3 px-5 py-2.5 border-b border-[#F8F8F8]">
-                {["Customer", "Bike", "Amount", "Type"].map(h => (
-                  <span key={h} className="text-[10px] font-bold text-[#ABABAB] uppercase tracking-wider">{h}</span>
+
+            {/* Pending Actions */}
+            <div className="bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+              <div className="px-5 py-4 border-b border-[#F3F4F6]">
+                <h3 className="text-[14px] font-bold text-[#111827]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Pending Actions</h3>
+                <p className="text-[11px] text-[#9CA3AF] mt-0.5">Items needing attention</p>
+              </div>
+              <div className="divide-y divide-[#F9FAFB]">
+                {[
+                  { label: "CR Pending", count: data.pendingCR, icon: FileCheck, href: "/cr-plates", urgent: data.pendingCR > 0, accent: "#F59E0B", bg: "#FFFBEB" },
+                  { label: "Plates Pending", count: data.pendingPlates, icon: Hash, href: "/cr-plates", urgent: false, accent: "#3B82F6", bg: "#EFF6FF" },
+                  { label: "Cheques Due (7d)", count: data.pendingCheques, icon: CreditCard, href: "/cheques/tvs", urgent: data.pendingCheques > 0, accent: "#EF4444", bg: "#FEF2F2" },
+                  { label: "Cheque Amount Due", count: null, amount: data.pendingChequeAmount, icon: Wallet, href: "/finance", urgent: false, accent: "#8B5CF6", bg: "#F5F3FF" },
+                ].map(({ label, count, amount, icon: Icon, href, urgent, accent, bg }) => (
+                  <Link key={label} href={href} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#F9FAFB] transition-colors">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
+                      <Icon className="h-4 w-4" style={{ color: accent }} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[12px] font-semibold text-[#111827]">{label}</p>
+                      {urgent && <p className="text-[10px] font-semibold" style={{ color: accent }}>Needs attention</p>}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[15px] font-bold text-[#111827] tabular-nums">
+                        {amount != null ? `Rs. ${fmt(amount)}` : count}
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 text-[#D1D5DB]" />
+                    </div>
+                  </Link>
                 ))}
               </div>
-              {data.recentSales.map((s) => (
-                <div key={s.id} className="grid grid-cols-[1.2fr_1fr_auto_auto] gap-3 px-5 py-3 hover:bg-[#FAFAFA] transition-colors items-center border-b border-[#F8F8F8] last:border-0">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-[#FF4C00]/8 flex items-center justify-center flex-shrink-0">
+            </div>
+          </div>
+
+        </div>
+
+        {/* ═══ RIGHT — panel ═══ */}
+        <div className="w-[300px] flex-shrink-0 space-y-5">
+
+          {/* Date card */}
+          <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+            <p className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wider mb-1">{greeting()}, {data.userName}</p>
+            <h2 className="text-[28px] font-extrabold text-[#111827] leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+              {new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
+            </h2>
+            <p className="text-[12px] text-[#9CA3AF] mt-0.5">
+              {new Date().toLocaleDateString("en-GB", { weekday: "long", year: "numeric" })}
+            </p>
+            <div className="mt-4 pt-4 border-t border-[#F3F4F6] grid grid-cols-2 gap-2">
+              <div className="bg-[#FFF3EF] rounded-xl px-3 py-2.5 text-center">
+                <p className="text-[22px] font-extrabold text-[#FF4C00] tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{data.todayCount}</p>
+                <p className="text-[10px] text-[#FF7043] font-semibold mt-0.5">Sales Today</p>
+              </div>
+              <div className="bg-[#F0FDF4] rounded-xl px-3 py-2.5 text-center">
+                <p className="text-[22px] font-extrabold text-emerald-600 tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{data.presentToday}</p>
+                <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Present</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Reminders / cheques due */}
+          <div className="bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+            <div className="px-5 py-4 border-b border-[#F3F4F6] flex items-center justify-between">
+              <div>
+                <h3 className="text-[14px] font-bold text-[#111827]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Upcoming Cheques</h3>
+                <p className="text-[11px] text-[#9CA3AF] mt-0.5">Due within 7 days</p>
+              </div>
+              <Link href="/cheques/tvs" className="text-[11px] font-semibold text-[#FF4C00] flex items-center gap-0.5 hover:underline">All <ArrowRight className="h-3 w-3" /></Link>
+            </div>
+            {data.reminders.length === 0 ? (
+              <div className="py-8 text-center">
+                <Bell className="h-5 w-5 mx-auto mb-2 text-[#D1D5DB]" />
+                <p className="text-[12px] text-[#9CA3AF]">No cheques due soon</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[#F9FAFB]">
+                {data.reminders.map((r, i) => {
+                  const diff = Math.ceil((new Date(r.date).getTime() - new Date().setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24));
+                  return (
+                    <div key={r.id + i} className="flex items-center gap-3 px-5 py-3.5">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${diff <= 0 ? "bg-[#FF4C00]" : diff <= 2 ? "bg-amber-400" : "bg-[#D1D5DB]"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-[#111827] truncate">{r.label}</p>
+                        <p className="text-[10px] text-[#9CA3AF]">{diff <= 0 ? "Today" : diff === 1 ? "Tomorrow" : `In ${diff} days`}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-[12px] font-bold text-[#111827] tabular-nums">Rs. {fmt(r.amount || 0)}</p>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${diff <= 0 ? "bg-[#FF4C00] text-white" : diff <= 2 ? "bg-amber-100 text-amber-700" : "bg-[#F3F4F6] text-[#9CA3AF]"}`}>
+                          {diff <= 0 ? "Today" : `${diff}d`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Sales feed */}
+          <div className="bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+            <div className="px-5 py-4 border-b border-[#F3F4F6] flex items-center justify-between">
+              <div>
+                <h3 className="text-[14px] font-bold text-[#111827]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Recent Sales</h3>
+                <p className="text-[11px] text-[#9CA3AF] mt-0.5">{data.monthCount} this month</p>
+              </div>
+              <Link href="/sales" className="text-[11px] font-semibold text-[#FF4C00] flex items-center gap-0.5 hover:underline">All <ArrowRight className="h-3 w-3" /></Link>
+            </div>
+            {data.recentSales.length === 0 ? (
+              <div className="py-8 text-center">
+                <ShoppingCart className="h-5 w-5 mx-auto mb-2 text-[#D1D5DB]" />
+                <p className="text-[12px] text-[#9CA3AF]">No sales yet</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[#F9FAFB]">
+                {data.recentSales.slice(0, 5).map(s => (
+                  <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-[#F9FAFB] transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-[#FFF3EF] flex items-center justify-center flex-shrink-0">
                       <span className="text-[10px] font-bold text-[#FF4C00]">
                         {s.customer_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                       </span>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-semibold text-[#0A0A0A] truncate">{s.customer_name}</p>
-                      <p className="text-[10px] text-[#ABABAB] font-mono">{s.invoice_number}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-[#111827] truncate">{s.customer_name}</p>
+                      <p className="text-[10px] text-[#9CA3AF] truncate">{s.bike_model}</p>
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="text-[12px] font-bold text-[#111827]">Rs. {fmt(s.total_amount)}</p>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${s.payment_type === "cash" ? "bg-emerald-50 text-emerald-700" : s.payment_type === "finance" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"}`}>
+                        {s.payment_type}
+                      </span>
                     </div>
                   </div>
-                  <p className="text-[12px] text-[#6B6B6B] truncate">{s.bike_model}</p>
-                  <p className="text-[13px] font-bold text-[#0A0A0A] whitespace-nowrap">Rs. {s.total_amount.toLocaleString()}</p>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${s.payment_type === "cash" ? "bg-emerald-50 text-emerald-700" : s.payment_type === "finance" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"}`}>
-                    {s.payment_type}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Pending */}
-        <div className="bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#F0F0F0]">
-            <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Pending Actions</h3>
-            <p className="text-[11px] text-[#ABABAB] mt-0.5">Items needing attention</p>
-          </div>
-          <div className="p-3 space-y-1.5">
-            {[
-              { label: "CR Pending", count: data.pendingCR, icon: FileCheck, href: "/cr-plates", urgent: data.pendingCR > 0, accent: "#F59E0B" },
-              { label: "Plates Pending", count: data.pendingPlates, icon: Hash, href: "/cr-plates", urgent: false, accent: "#3B82F6" },
-              { label: "Cheques Due (7d)", count: data.pendingCheques, icon: CreditCard, href: "/cheques/tvs", urgent: data.pendingCheques > 0, accent: "#EF4444" },
-              { label: "Cheque Amount", count: null, amount: data.pendingChequeAmount, icon: Wallet, href: "/finance", urgent: false, accent: "#8B5CF6" },
-            ].map(({ label, count, amount, icon: Icon, href, urgent, accent }) => (
-              <Link key={label} href={href}
-                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors group ${urgent ? "bg-red-50 border border-red-100" : "hover:bg-[#FAFAFA] border border-transparent"}`}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${accent}15` }}>
-                  <Icon className="h-4 w-4" style={{ color: accent }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-semibold text-[#0A0A0A]">{label}</p>
-                  {urgent && <p className="text-[10px] font-semibold" style={{ color: accent }}>Needs attention</p>}
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <span className="text-[14px] font-bold text-[#0A0A0A]">
-                    {amount != null ? `Rs. ${fmt(amount)}` : count}
-                  </span>
-                  <ChevronRight className="h-3.5 w-3.5 text-[#D0D0D0]" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Inventory Overview ───────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-[#EBEBEB] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#F0F0F0] flex items-center justify-between">
-          <div>
-            <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Inventory Overview</h3>
-            <p className="text-[11px] text-[#ABABAB] mt-0.5">Stock health by model</p>
-          </div>
-          <Link href="/inventory/bikes" className="flex items-center gap-1 text-[11px] font-semibold text-[#FF4C00] hover:underline">Manage <ArrowRight className="h-3 w-3" /></Link>
-        </div>
-        {data.inventoryByModel.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-[#D0D0D0]">
-            <Bike className="h-8 w-8 mb-2" />
-            <p className="text-[12px] font-medium text-[#ABABAB]">No inventory data yet</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#F5F5F5]">
-                  {["Model", "Available", "Sold", "Reserved", "Total", "Stock Health"].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-[10px] font-bold text-[#ABABAB] uppercase tracking-wider whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.inventoryByModel.map(m => {
-                  const pct = m.total > 0 ? (m.available / m.total) * 100 : 0;
-                  const color = pct > 60 ? "#10B981" : pct > 30 ? "#F59E0B" : "#EF4444";
-                  return (
-                    <tr key={m.model} className="border-b border-[#F8F8F8] last:border-0 hover:bg-[#FAFAFA] transition-colors">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-6 h-6 rounded-lg bg-[#FF4C00]/8 flex items-center justify-center">
-                            <Bike className="h-3 w-3 text-[#FF4C00]" />
-                          </div>
-                          <span className="text-[12px] font-semibold text-[#0A0A0A]">{m.model}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3"><span className="text-[12px] font-bold text-emerald-600">{m.available}</span></td>
-                      <td className="px-5 py-3"><span className="text-[12px] text-[#9A9A9A]">{m.sold}</span></td>
-                      <td className="px-5 py-3"><span className="text-[12px] text-amber-600">{m.reserved}</span></td>
-                      <td className="px-5 py-3"><span className="text-[12px] font-medium text-[#0A0A0A]">{m.total}</span></td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex-1 max-w-[100px] h-1.5 bg-[#F0F0F0] rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ background: color, width: `${Math.max(pct, 2)}%` }} />
-                          </div>
-                          <span className="text-[11px] font-bold" style={{ color }}>{Math.round(pct)}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── Finance Snapshot ─────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {[
-          { label: "TVS Commission", current: data.tvsCommission, prev: data.prevTvs, accent: "#FF4C00" },
-          { label: "Finance Commission", current: data.financeCommission, prev: data.prevFinance, accent: "#3B82F6" },
-          { label: "Insurance Commission", current: data.insuranceCommission, prev: data.prevInsurance, accent: "#8B5CF6" },
-        ].map(({ label, current, prev, accent }) => {
-          const diff = prev > 0 ? ((current - prev) / prev) * 100 : null;
-          return (
-            <div key={label} className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-bold text-[#9A9A9A] uppercase tracking-wider">{label}</span>
-                {diff !== null && (
-                  <span className={`text-[11px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${diff >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
-                    {diff >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                    {Math.abs(diff).toFixed(1)}%
-                  </span>
-                )}
+                ))}
               </div>
-              <p className="text-[26px] font-bold text-[#0A0A0A] leading-none" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-                Rs. {current.toLocaleString()}
-              </p>
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#F5F5F5]">
-                <span className="text-[11px] text-[#ABABAB]">Last month</span>
-                <span className="text-[11px] font-semibold text-[#6B6B6B]">Rs. {prev.toLocaleString()}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            )}
+          </div>
 
-      {/* ── Reminders Timeline ───────────────────────────────── */}
-      {data.reminders.length > 0 && (
-        <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
-          <SH title="Upcoming Reminders" sub="Cheques and actions due soon" href="/finance" action="View All" />
-          <div className="relative space-y-3 pl-8">
-            <div className="absolute left-3 top-0 bottom-0 w-px bg-[#F0F0F0]" />
-            {data.reminders.map((r, i) => {
-              const diff = Math.ceil((new Date(r.date).getTime() - new Date().setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24));
-              return (
-                <div key={r.id + i} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`absolute left-[7px] w-2.5 h-2.5 rounded-full border-2 ${diff <= 0 ? "bg-[#FF4C00] border-[#FF4C00]" : diff <= 2 ? "bg-amber-400 border-amber-400" : "bg-[#E0E0E0] border-[#E0E0E0]"}`} />
-                    <div>
-                      <p className="text-[12px] font-semibold text-[#0A0A0A]">{r.label}</p>
-                      <p className="text-[10px] text-[#ABABAB]">{diff <= 0 ? "Today" : diff === 1 ? "Tomorrow" : `In ${diff} days`}{r.amount ? ` · Rs. ${r.amount.toLocaleString()}` : ""}</p>
+          {/* Attendance snapshot */}
+          <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[14px] font-bold text-[#111827]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Today&#39;s Attendance</h3>
+              <Link href="/hr/attendance" className="text-[11px] font-semibold text-[#FF4C00] hover:underline">Mark</Link>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative w-16 h-16 flex-shrink-0">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 60 60">
+                  <circle cx="30" cy="30" r="24" fill="none" stroke="#F3F4F6" strokeWidth="6" />
+                  <circle cx="30" cy="30" r="24" fill="none" stroke="#FF4C00" strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(attPct / 100) * (2 * Math.PI * 24)} ${2 * Math.PI * 24}`} />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-[13px] font-bold text-[#111827]">{attPct}%</span>
+                </div>
+              </div>
+              <div className="space-y-2 flex-1">
+                {[
+                  { label: "Present", value: data.presentToday, color: "bg-emerald-400" },
+                  { label: "Absent",  value: data.absentToday,  color: "bg-red-400" },
+                  { label: "On Leave",value: data.leaveToday,   color: "bg-amber-400" },
+                ].map(s => (
+                  <div key={s.label} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.color}`} />
+                      <span className="text-[11px] text-[#6B7280]">{s.label}</span>
                     </div>
+                    <span className="text-[12px] font-bold text-[#111827] tabular-nums">{s.value}</span>
                   </div>
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${diff <= 0 ? "bg-[#FF4C00] text-white" : diff <= 2 ? "bg-amber-100 text-amber-700" : "bg-[#F5F5F5] text-[#9A9A9A]"}`}>
-                    {diff <= 0 ? "Today" : diff === 1 ? "Tomorrow" : `${diff}d`}
-                  </span>
-                </div>
-              );
-            })}
+                ))}
+                {data.totalEmployees === 0 && <p className="text-[10px] text-[#9CA3AF]">No data today</p>}
+              </div>
+            </div>
           </div>
+
         </div>
-      )}
+      </div>{/* end flex gap-5 */}
     </div>
   );
 }
@@ -663,14 +615,19 @@ export default function DashboardPage() {
 // ─── Skeleton ─────────────────────────────────────────────────────
 function Skeleton() {
   return (
-    <div className="space-y-5 max-w-[1600px] pb-8 animate-pulse">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2"><div className="h-3 w-48 bg-[#EBEBEB] rounded" /><div className="h-7 w-64 bg-[#EBEBEB] rounded-lg" /></div>
-        <div className="h-9 w-28 bg-[#EBEBEB] rounded-xl" />
+    <div className="pb-8 max-w-[1600px] animate-pulse">
+      <div className="flex gap-5">
+        <div className="flex-1 space-y-5">
+          <div className="h-64 bg-white border border-[#EBEBEB] rounded-2xl" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }} />
+          <div className="h-52 bg-white border border-[#EBEBEB] rounded-2xl" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }} />
+          <div className="grid grid-cols-2 gap-5"><div className="h-48 bg-white border border-[#EBEBEB] rounded-2xl" /><div className="h-48 bg-white border border-[#EBEBEB] rounded-2xl" /></div>
+        </div>
+        <div className="w-[300px] space-y-5 flex-shrink-0">
+          <div className="h-44 bg-white border border-[#EBEBEB] rounded-2xl" />
+          <div className="h-52 bg-white border border-[#EBEBEB] rounded-2xl" />
+          <div className="h-52 bg-white border border-[#EBEBEB] rounded-2xl" />
+        </div>
       </div>
-      <div className="grid grid-cols-4 gap-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 bg-white border border-[#EBEBEB] rounded-2xl" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }} />)}</div>
-      <div className="grid grid-cols-3 gap-4"><div className="col-span-2 h-72 bg-white border border-[#EBEBEB] rounded-2xl" /><div className="h-72 bg-white border border-[#EBEBEB] rounded-2xl" /></div>
-      <div className="grid grid-cols-3 gap-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-52 bg-white border border-[#EBEBEB] rounded-2xl" />)}</div>
     </div>
   );
 }
