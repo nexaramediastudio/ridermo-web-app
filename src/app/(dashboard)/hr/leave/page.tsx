@@ -49,7 +49,7 @@ export default function LeavePage() {
     const [leavesRes, empRes] = await Promise.all([
       supabase
         .from("leaves")
-        .select("*, employees(full_name)")
+        .select("*, employees!leaves_employee_id_fkey(full_name)")
         .order("created_at", { ascending: false }),
       supabase
         .from("employees")
