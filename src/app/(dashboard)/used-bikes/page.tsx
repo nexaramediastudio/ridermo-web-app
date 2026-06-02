@@ -162,14 +162,14 @@ export default function UsedBikesPage() {
           { label: "Sold", value: soldCount, icon: CheckCircle2, accent: false },
           { label: "Total Revenue", value: `Rs. ${totalRevenue.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: TrendingUp, accent: false },
         ].map(({ label, value, icon: Icon, accent }) => (
-          <div key={label} className="bg-white rounded-2xl border border-[#EFEFEF] p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">{label}</span>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${accent ? "bg-[#FF4C00]/10" : "bg-[#F5F5F5]"}`}>
-                <Icon className={`h-4 w-4 ${accent ? "text-[#FF4C00]" : "text-[#9A9A9A]"}`} />
-              </div>
+          <div key={label} className="bg-white rounded-xl border border-[#E8E8E8] px-4 py-3 flex items-center justify-between gap-3 hover:border-[#D0D0D0] transition-colors">
+            <div>
+              <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{label}</p>
+              <p className="text-xl font-bold tabular-nums mt-0.5 text-[#0A0A0A]">{value}</p>
             </div>
-            <p className="text-xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${accent ? "bg-[#FF4C00]/10" : "bg-[#F5F5F5]"}`}>
+              <Icon className={`h-4 w-4 ${accent ? "text-[#FF4C00]" : "text-[#9A9A9A]"}`} />
+            </div>
           </div>
         ))}
       </div>

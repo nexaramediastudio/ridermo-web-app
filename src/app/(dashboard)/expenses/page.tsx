@@ -121,29 +121,29 @@ export default function ExpensesPage() {
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="r-kpi col-span-1">
-          <div className="flex items-center justify-between mb-3">
-            <span className="r-page-sub">Total This Month</span>
-            <Wallet className="h-4 w-4 text-[#ABABAB]" />
+          <div>
+            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">Total This Month</p>
+            <p className="text-xl font-bold tabular-nums mt-0.5 text-[#FF4C00]">Rs. {totalAmount.toLocaleString("en", { maximumFractionDigits: 0 })}</p>
           </div>
-          <p className="text-2xl font-bold font-display text-[#FF4C00]">Rs. {totalAmount.toLocaleString("en", { maximumFractionDigits: 0 })}</p>
+          <Wallet className="h-4 w-4 text-[#D5D5D5] flex-shrink-0" />
         </div>
         <div className="r-kpi">
-          <div className="flex items-center justify-between mb-3">
-            <span className="r-page-sub">Entries</span>
-            <Receipt className="h-4 w-4 text-[#ABABAB]" />
+          <div>
+            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">Entries</p>
+            <p className="text-xl font-bold tabular-nums mt-0.5 text-[#0A0A0A]">{expenses.length}</p>
           </div>
-          <p className="text-2xl font-bold font-display text-[#0A0A0A]">{expenses.length}</p>
+          <Receipt className="h-4 w-4 text-[#D5D5D5] flex-shrink-0" />
         </div>
         <div className="r-kpi">
-          <div className="flex items-center justify-between mb-3">
-            <span className="r-page-sub">Largest Category</span>
-            <TrendingDown className="h-4 w-4 text-[#ABABAB]" />
+          <div>
+            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">Largest Category</p>
+            <p className="text-[13px] font-bold mt-0.5 text-[#0A0A0A]">
+              {Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0]
+                ? CATEGORY_CONFIG[Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0][0] as ExpenseCategory]?.label
+                : "—"}
+            </p>
           </div>
-          <p className="text-[13px] font-bold text-[#0A0A0A]">
-            {Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0]
-              ? CATEGORY_CONFIG[Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0][0] as ExpenseCategory]?.label
-              : "—"}
-          </p>
+          <TrendingDown className="h-4 w-4 text-[#D5D5D5] flex-shrink-0" />
         </div>
       </div>
 

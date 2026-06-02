@@ -157,12 +157,12 @@ export function ChequesView({ type }: { type: ChequeType }) {
           { label: "Total Cheques",   value: `${cheques.length}`,   sub: "all time",  color: "text-[#0A0A0A]", icon: DollarSign },
         ].map((k) => (
           <div key={k.label} className="r-kpi">
-            <div className="flex items-center justify-between mb-3">
-              <span className="r-page-sub">{k.label}</span>
-              <k.icon className="h-4 w-4 text-[#ABABAB]" />
+            <div>
+              <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{k.label}</p>
+              <p className={`text-xl font-bold tabular-nums mt-0.5 ${k.color}`}>{k.value}</p>
+              <p className="text-[10px] text-[#ABABAB]">{k.sub}</p>
             </div>
-            <p className={`text-xl font-bold font-display ${k.color}`}>{k.value}</p>
-            <p className="text-[11px] text-[#ABABAB] mt-0.5">{k.sub}</p>
+            <k.icon className="h-4 w-4 text-[#D5D5D5] flex-shrink-0" />
           </div>
         ))}
       </div>

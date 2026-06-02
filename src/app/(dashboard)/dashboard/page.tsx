@@ -78,21 +78,23 @@ function KPI({ label, value, sub, trend, color, icon: Icon }: {
   color: string; icon: React.ElementType;
 }) {
   return (
-    <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5 hover:border-[#D0D0D0] transition-colors">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon className="h-4.5 w-4.5" style={{ width: 18, height: 18 }} />
+    <div className="bg-white border border-[#E8E8E8] rounded-xl px-4 py-3 flex items-center justify-between gap-3 hover:border-[#D0D0D0] transition-colors">
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
+          <Icon style={{ width: 16, height: 16 }} />
         </div>
-        {trend && (
-          <span className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg ${trend.up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
-            {trend.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {trend.v}
-          </span>
-        )}
+        <div>
+          <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{label}</p>
+          <p className="text-[17px] font-bold text-[#0A0A0A] leading-tight tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
+          {sub && <p className="text-[10px] text-[#ABABAB]">{sub}</p>}
+        </div>
       </div>
-      <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wider mb-1">{label}</p>
-      <p className="text-[28px] font-bold text-[#0A0A0A] leading-none tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
-      {sub && <p className="text-xs text-[#ABABAB] mt-1.5">{sub}</p>}
+      {trend && (
+        <span className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${trend.up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
+          {trend.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+          {trend.v}
+        </span>
+      )}
     </div>
   );
 }
@@ -668,7 +670,7 @@ function Skeleton() {
         <div className="space-y-2"><div className="h-3 w-48 bg-[#EBEBEB] rounded" /><div className="h-7 w-64 bg-[#EBEBEB] rounded-lg" /></div>
         <div className="h-9 w-28 bg-[#EBEBEB] rounded-xl" />
       </div>
-      <div className="grid grid-cols-4 gap-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-32 bg-white border border-[#EBEBEB] rounded-2xl" />)}</div>
+      <div className="grid grid-cols-4 gap-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 bg-white border border-[#EBEBEB] rounded-xl" />)}</div>
       <div className="grid grid-cols-3 gap-4"><div className="col-span-2 h-72 bg-white border border-[#EBEBEB] rounded-2xl" /><div className="h-72 bg-white border border-[#EBEBEB] rounded-2xl" /></div>
       <div className="grid grid-cols-3 gap-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-52 bg-white border border-[#EBEBEB] rounded-2xl" />)}</div>
     </div>

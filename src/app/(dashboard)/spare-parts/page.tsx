@@ -148,14 +148,14 @@ export default function SparePartsPage() {
           { label: "Low / Out of Stock", value: lowStockCount, icon: AlertTriangle, accent: lowStockCount > 0 },
           { label: "Stock Value", value: `Rs. ${totalValue.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: TrendingUp, accent: false },
         ].map(({ label, value, icon: Icon, accent }) => (
-          <div key={label} className={`bg-white rounded-2xl border p-4 ${accent ? "border-amber-200" : "border-[#EFEFEF]"}`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">{label}</span>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${accent ? "bg-amber-100" : "bg-[#F5F5F5]"}`}>
-                <Icon className={`h-4 w-4 ${accent ? "text-amber-600" : "text-[#9A9A9A]"}`} />
-              </div>
+          <div key={label} className={`bg-white rounded-xl border px-4 py-3 flex items-center justify-between gap-3 hover:border-[#D0D0D0] transition-colors ${accent ? "border-amber-200" : "border-[#E8E8E8]"}`}>
+            <div>
+              <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{label}</p>
+              <p className={`text-xl font-bold tabular-nums mt-0.5 ${accent ? "text-amber-600" : "text-[#0A0A0A]"}`}>{value}</p>
             </div>
-            <p className={`text-xl font-bold ${accent ? "text-amber-600" : "text-[#0A0A0A]"}`} style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${accent ? "bg-amber-100" : "bg-[#F5F5F5]"}`}>
+              <Icon className={`h-4 w-4 ${accent ? "text-amber-600" : "text-[#9A9A9A]"}`} />
+            </div>
           </div>
         ))}
       </div>

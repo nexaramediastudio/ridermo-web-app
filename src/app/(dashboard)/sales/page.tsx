@@ -150,14 +150,14 @@ export default function SalesHistoryPage() {
           { label: "Finance Commission", value: `Rs. ${totalFinance.toLocaleString()}`, icon: Building2, color: "bg-[#F5F5F5] text-[#6B6B6B]", main: false },
           { label: "Insurance Commission", value: `Rs. ${totalIns.toLocaleString()}`, icon: Shield, color: "bg-[#F5F5F5] text-[#6B6B6B]", main: false },
         ].map(({ label, value, icon: Icon, color, main }) => (
-          <div key={label} className="bg-white border border-[#E8E8E8] rounded-2xl p-5 hover:border-[#D0D0D0] transition-colors">
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-                <Icon style={{ width: 17, height: 17 }} />
-              </div>
+          <div key={label} className="bg-white border border-[#E8E8E8] rounded-xl px-4 py-3 flex items-center gap-3 hover:border-[#D0D0D0] transition-colors">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
+              <Icon style={{ width: 15, height: 15 }} />
             </div>
-            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wider mb-1">{label}</p>
-            <p className="text-[24px] font-bold text-[#0A0A0A] leading-tight tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
+            <div>
+              <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{label}</p>
+              <p className="text-[17px] font-bold text-[#0A0A0A] leading-tight tabular-nums" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
+            </div>
           </div>
         ))}
       </div>

@@ -141,11 +141,11 @@ export default function LeavePage() {
           { label: "Total",    value: leaves.length, icon: Users,        color: "text-[#0A0A0A]" },
         ].map((k) => (
           <div key={k.label} className="r-kpi">
-            <div className="flex items-center justify-between mb-3">
-              <span className="r-page-sub">{k.label}</span>
-              <k.icon className="h-4 w-4 text-[#ABABAB]" />
+            <div>
+              <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{k.label}</p>
+              <p className={`text-xl font-bold tabular-nums mt-0.5 ${k.color}`}>{k.value}</p>
             </div>
-            <p className={`text-2xl font-bold font-display ${k.color}`}>{k.value}</p>
+            <k.icon className="h-4 w-4 text-[#D5D5D5] flex-shrink-0" />
           </div>
         ))}
       </div>

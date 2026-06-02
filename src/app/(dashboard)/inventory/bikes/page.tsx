@@ -139,8 +139,8 @@ export default function InventoryBikesPage() {
           { label: "Transferred", value: counts.transferred, color: "text-blue-600" },
         ].map((k) => (
           <div key={k.label} className="r-kpi">
-            <p className="r-page-sub mb-2">{k.label}</p>
-            <p className={`text-2xl font-bold font-display ${k.color}`}>{k.value}</p>
+            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{k.label}</p>
+            <p className={`text-xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
           </div>
         ))}
       </div>

@@ -289,16 +289,16 @@ export default function ReportsPage() {
           { label: "Margin", value: `${margin.toFixed(1)}%`, sub: "Profit margin", icon: BarChart2, accent: false, up: margin > 20 },
           { label: "Commission", value: fmt(totalComm), sub: "TVS + Finance + Ins.", icon: Receipt, accent: false, up: totalComm > 0 },
         ].map(({ label, value, sub, icon: Icon, accent, up }) => (
-          <div key={label} className={`bg-white rounded-2xl p-5 border ${accent ? "border-[#FF4C00]/15" : "border-[#E8E8E8]"}`}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-widest">{label}</span>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${accent ? "bg-[#FF4C00]" : up ? "bg-emerald-50" : "bg-[#F5F5F5]"}`}>
-                <Icon className={`h-4 w-4 ${accent ? "text-white" : up ? "text-emerald-600" : "text-[#9A9A9A]"}`} />
-              </div>
+          <div key={label} className={`bg-white rounded-xl px-4 py-3 border flex items-center justify-between gap-3 hover:border-[#D0D0D0] transition-colors ${accent ? "border-[#FF4C00]/20" : "border-[#E8E8E8]"}`}>
+            <div>
+              <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{label}</p>
+              <p className={`text-xl font-bold tabular-nums mt-0.5 leading-tight ${accent ? "text-[#FF4C00]" : label === "Net Profit" && !up ? "text-red-500" : "text-[#0A0A0A]"}`}
+                style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
+              <p className="text-[10px] text-[#ABABAB]">{sub}</p>
             </div>
-            <p className={`text-2xl font-bold leading-tight ${accent ? "text-[#FF4C00]" : up ? "text-[#0A0A0A]" : label === "Net Profit" ? "text-red-500" : "text-[#0A0A0A]"}`}
-              style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
-            <p className="text-xs text-[#ABABAB] mt-1.5">{sub}</p>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${accent ? "bg-[#FF4C00]" : up ? "bg-emerald-50" : "bg-[#F5F5F5]"}`}>
+              <Icon className={`h-4 w-4 ${accent ? "text-white" : up ? "text-emerald-600" : "text-[#9A9A9A]"}`} />
+            </div>
           </div>
         ))}
       </div>
@@ -458,10 +458,12 @@ export default function ReportsPage() {
               { label: "Finance Sales", count: salesRows.filter(s=>s.payment_type==="finance").length, total: salesRows.filter(s=>s.payment_type==="finance").reduce((s,r)=>s+r.total_amount,0), color: "bg-blue-50", text: "text-blue-700" },
               { label: "Insurance Sales", count: salesRows.filter(s=>s.payment_type==="insurance").length, total: salesRows.filter(s=>s.payment_type==="insurance").reduce((s,r)=>s+r.total_amount,0), color: "bg-purple-50", text: "text-purple-700" },
             ].map(({ label, count, total, color, text }) => (
-              <div key={label} className={`${color} rounded-2xl p-5`}>
-                <p className={`text-xs font-bold uppercase tracking-wider ${text} mb-2`}>{label}</p>
-                <p className={`text-2xl font-bold ${text}`} style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{count}</p>
-                <p className={`text-sm font-semibold ${text} mt-1`}>{fmt(total)}</p>
+              <div key={label} className={`${color} rounded-xl px-4 py-3 flex items-center justify-between gap-3`}>
+                <div>
+                  <p className={`text-[11px] font-bold uppercase tracking-wider ${text}`}>{label}</p>
+                  <p className={`text-xl font-bold tabular-nums mt-0.5 ${text}`} style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{count}</p>
+                  <p className={`text-[11px] font-semibold ${text}`}>{fmt(total)}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -746,10 +748,12 @@ export default function ReportsPage() {
               { label: "Available", value: inventoryRows.reduce((s,r)=>s+r.available,0), sub: "Ready for sale" },
               { label: "Total Stock Value", value: fmt(inventoryRows.reduce((s,r)=>s+r.stockValue,0)), sub: "Available units" },
             ].map(({ label, value, sub }) => (
-              <div key={label} className="bg-white rounded-2xl p-5 border border-[#E8E8E8]">
-                <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-widest mb-2">{label}</p>
-                <p className="text-2xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
-                <p className="text-xs text-[#ABABAB] mt-1">{sub}</p>
+              <div key={label} className="bg-white rounded-xl border border-[#E8E8E8] px-4 py-3 flex items-center justify-between gap-3 hover:border-[#D0D0D0] transition-colors">
+                <div>
+                  <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{label}</p>
+                  <p className="text-xl font-bold tabular-nums mt-0.5 text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{value}</p>
+                  <p className="text-[10px] text-[#ABABAB]">{sub}</p>
+                </div>
               </div>
             ))}
           </div>

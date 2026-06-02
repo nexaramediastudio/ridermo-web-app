@@ -85,11 +85,11 @@ export default function CustomersPage() {
           { label: "Total Purchases", value: "—", icon: TrendingUp, color: "text-[#FF4C00]" },
         ].map((kpi) => (
           <div key={kpi.label} className="r-kpi">
-            <div className="flex items-center justify-between mb-3">
-              <span className="r-page-sub">{kpi.label}</span>
-              <kpi.icon className="h-4 w-4 text-[#ABABAB]" />
+            <div>
+              <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{kpi.label}</p>
+              <p className={`text-xl font-bold tabular-nums mt-0.5 ${kpi.color}`}>{kpi.value}</p>
             </div>
-            <p className={`text-2xl font-bold font-display ${kpi.color}`}>{kpi.value}</p>
+            <kpi.icon className="h-4 w-4 text-[#D5D5D5] flex-shrink-0" />
           </div>
         ))}
       </div>
