@@ -131,7 +131,7 @@ export default function AttendancePage() {
   const isToday = selectedDate === new Date().toISOString().split("T")[0];
 
   return (
-    <div className="space-y-6 max-w-[1000px]">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -230,29 +230,29 @@ export default function AttendancePage() {
               const style = getStatusStyle(currentStatus);
 
               return (
-                <div key={emp.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#FAFAFA] transition-colors">
+                <div key={emp.id} className="flex items-center gap-5 px-5 py-3 hover:bg-[#FAFAFA] transition-colors">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${emp.type === "director" ? "bg-[#FF4C00]/15 text-[#FF4C00]" : "bg-[#F5F5F5] text-[#6B6B6B]"}`}>
                     {emp.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
 
-                  <div className="w-44 flex-shrink-0 min-w-0">
+                  <div className="w-52 flex-shrink-0">
                     <p className="text-[13px] font-semibold text-[#0A0A0A] truncate">{emp.full_name}</p>
                     <p className="text-[11px] text-[#9A9A9A] capitalize">{emp.type}{emp.employee_code ? ` · ${emp.employee_code}` : ""}</p>
                   </div>
 
-                  <div className="flex items-center gap-1 flex-wrap flex-1">
+                  <div className="flex items-center gap-1.5 flex-1">
                     {STATUS_OPTIONS.map((s) => (
                       <button
                         key={s.value}
                         onClick={() => setStatus(emp.id, s.value)}
-                        className={`flex items-center gap-1 h-7 px-2.5 rounded-lg text-[11px] font-semibold border transition-all ${
+                        className={`flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all whitespace-nowrap ${
                           currentStatus === s.value
                             ? `${s.bg} ${s.color}`
-                            : "border-transparent text-[#ABABAB] hover:border-[#E8E8E8] hover:text-[#6B6B6B] hover:bg-[#F5F5F5]"
+                            : "border-[#E8E8E8] text-[#9A9A9A] hover:text-[#0A0A0A] hover:bg-[#F5F5F5] hover:border-[#D0D0D0]"
                         }`}
                       >
-                        <s.icon className="h-3 w-3" />
-                        <span className="hidden sm:inline">{s.label}</span>
+                        <s.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                        {s.label}
                       </button>
                     ))}
                   </div>

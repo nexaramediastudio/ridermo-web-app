@@ -192,7 +192,7 @@ export default function PayrollPage() {
   const paidCount = Object.values(payroll).filter((p) => p.status === "paid").length;
 
   return (
-    <div className="space-y-5 max-w-[1400px]">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>

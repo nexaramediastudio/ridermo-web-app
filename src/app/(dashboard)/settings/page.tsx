@@ -725,7 +725,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("company");
 
   return (
-    <div className="space-y-6 max-w-[1000px]">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-[#F5F5F5] flex items-center justify-center">
           <Settings2 className="h-5 w-5 text-[#6B6B6B]" />
