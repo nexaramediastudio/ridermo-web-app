@@ -58,7 +58,7 @@ function Dropdown({ item, onClose }: { item: NavItem; onClose: () => void }) {
   const pathname = usePathname();
   if (!item.children) return null;
   return (
-    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-[#EBEBEB] overflow-hidden z-50 py-1.5">
+    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-52 bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden py-1.5" style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.12)", zIndex: 9999 }}>
       {item.children.map((child) => {
         const active = pathname.startsWith(child.href);
         return (
@@ -139,9 +139,9 @@ export function TopNav() {
   }
 
   return (
-    <header className="h-14 bg-white border-b border-[#EBEBEB] flex items-center px-5 gap-4 flex-shrink-0 sticky top-0 z-40">
-      {/* Logo */}
-      <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0 mr-4">
+    <header className="h-14 bg-white border-b border-[#EBEBEB] flex items-center px-6 flex-shrink-0 sticky top-0" style={{ zIndex: 1000 }}>
+      {/* Logo — left */}
+      <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0 w-36">
         <div className="w-7 h-7 rounded-lg bg-[#FF4C00] flex items-center justify-center">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
             <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" fill="white" fillOpacity="0.9" />
@@ -153,13 +153,13 @@ export function TopNav() {
         </span>
       </Link>
 
-      {/* Nav items */}
-      <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+      {/* Nav items — truly centered */}
+      <nav className="flex-1 flex items-center justify-center gap-0.5">
         {NAV.map(item => <NavButton key={item.label} item={item} />)}
       </nav>
 
-      {/* Right side */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      {/* Right side — fixed width to balance logo */}
+      <div className="flex items-center gap-2 flex-shrink-0 w-36 justify-end">
         {/* Search */}
         {searchOpen ? (
           <div className="flex items-center gap-2 h-8 px-3 bg-[#F5F5F5] rounded-lg border border-[#E8E8E8]">
