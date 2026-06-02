@@ -95,64 +95,63 @@ export default function InventoryBikesPage() {
   };
 
   return (
-    <div className="space-y-5 max-w-[1400px]">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2
-            className="text-xl font-bold text-[#0A0A0A]"
-            style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-          >
-            TVS Bikes Inventory
-          </h2>
-          <p className="text-sm text-[#9A9A9A] mt-0.5">
-            {bikes.filter((b) => b.status === "in_stock").length} bikes in stock
-          </p>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#FF4C00]/10 flex items-center justify-center">
+            <Bike className="h-5 w-5 text-[#FF4C00]" />
+          </div>
+          <div>
+            <h1 className="r-page-title">TVS Bikes Inventory</h1>
+            <p className="r-page-sub">
+              {bikes.filter((b) => b.status === "in_stock").length} in stock · {bikes.length} total
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 h-9 px-3 text-sm font-medium text-[#4A4A4A] border border-[#E5E5E5] rounded-xl hover:bg-[#F5F5F5] transition-all">
-            <Download className="h-3.5 w-3.5" />
-            Export
+          <button className="r-btn-secondary">
+            <Download className="h-3.5 w-3.5" /> Export
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 h-9 px-4 bg-[#FF4C00] hover:bg-[#E64400] text-white text-sm font-semibold rounded-xl transition-all"
+            className="r-btn-primary"
           >
-            <Plus className="h-4 w-4" />
-            Add Bike
+            <Plus className="h-4 w-4" /> Add Bike
           </button>
         </div>
       </div>
 
-      {/* Status Tabs */}
-      <div className="flex items-center gap-1 bg-[#F5F5F5] rounded-xl p-1 w-fit">
-        {(["all", "in_stock", "sold", "reserved", "transferred"] as StatusFilter[]).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`
-              flex items-center gap-2 h-8 px-3 rounded-lg text-xs font-semibold transition-all
-              ${statusFilter === s
-                ? "bg-white text-[#0A0A0A] shadow-sm"
-                : "text-[#6B6B6B] hover:text-[#0A0A0A]"
-              }
-            `}
-          >
-            {s === "all" ? "All" : STATUS_LABELS[s]}
-            <span
-              className={`
-                text-[10px] px-1.5 py-0.5 rounded-full font-bold
-                ${statusFilter === s ? "bg-[#FF4C00]/10 text-[#FF4C00]" : "bg-[#E5E5E5] text-[#6B6B6B]"}
-              `}
-            >
-              {counts[s]}
-            </span>
-          </button>
+      {/* KPIs */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: "In Stock",    value: counts.in_stock,    color: "text-emerald-600" },
+          { label: "Sold",        value: counts.sold,        color: "text-[#6B6B6B]" },
+          { label: "Reserved",    value: counts.reserved,    color: "text-amber-600" },
+          { label: "Transferred", value: counts.transferred, color: "text-blue-600" },
+        ].map((k) => (
+          <div key={k.label} className="r-kpi">
+            <p className="r-page-sub mb-2">{k.label}</p>
+            <p className={`text-2xl font-bold font-display ${k.color}`}>{k.value}</p>
+          </div>
         ))}
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-3">
+      {/* Filters */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="r-tabs">
+          {(["all", "in_stock", "sold", "reserved", "transferred"] as StatusFilter[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`${statusFilter === s ? "r-tab-on" : "r-tab-off"} flex items-center gap-1.5`}
+            >
+              {s === "all" ? "All" : STATUS_LABELS[s]}
+              <span className="text-[10px] font-bold text-[#9A9A9A]">{counts[s]}</span>
+            </button>
+          ))}
+        </div>
+
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#ABABAB]" />
           <input
@@ -160,43 +159,24 @@ export default function InventoryBikesPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by Round No., Chassis, Engine..."
-            className="w-full h-9 pl-9 pr-4 rounded-xl border border-[#E5E5E5] text-sm placeholder:text-[#ABABAB] focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] transition-all bg-white"
+            className="r-input pl-9"
           />
         </div>
-        <button className="flex items-center gap-2 h-9 px-3 text-sm font-medium text-[#4A4A4A] border border-[#E5E5E5] rounded-xl hover:bg-[#F5F5F5] transition-all">
-          <Filter className="h-3.5 w-3.5" />
-          Filters
-          <ChevronDown className="h-3 w-3 text-[#ABABAB]" />
-        </button>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-[#EFEFEF] overflow-hidden">
+      <div className="r-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="r-table">
             <thead>
-              <tr className="border-b border-[#F0F0F0]">
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">
-                  Round No.
-                </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">
-                  Model
-                </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">
-                  Color
-                </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">
-                  Chassis No.
-                </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">
-                  Engine No.
-                </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">
-                  Price
-                </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">
-                  Status
-                </th>
+              <tr className="r-thead-row">
+                <th className="r-th">Round No.</th>
+                <th className="r-th">Model</th>
+                <th className="r-th">Color</th>
+                <th className="r-th">Chassis No.</th>
+                <th className="r-th">Engine No.</th>
+                <th className="r-th">Price</th>
+                <th className="r-th">Status</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">
                   Stock Date
                 </th>
@@ -217,16 +197,18 @@ export default function InventoryBikesPage() {
               ) : bikes.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-5 py-16 text-center">
-                    <Bike className="h-10 w-10 mx-auto mb-3 text-[#E0E0E0]" />
-                    <p className="text-sm font-semibold text-[#6B6B6B]">No bikes found</p>
-                    <p className="text-xs text-[#ABABAB] mt-1">
+                    <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mx-auto mb-3">
+                      <Bike className="h-7 w-7 text-[#ABABAB]" />
+                    </div>
+                    <p className="text-[13px] font-semibold text-[#4A4A4A]">No bikes found</p>
+                    <p className="text-[11px] text-[#ABABAB] mt-1">
                       {statusFilter !== "all"
                         ? `No bikes with status "${STATUS_LABELS[statusFilter]}"`
                         : "Add your first bike to get started"}
                     </p>
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="mt-4 flex items-center gap-2 h-9 px-4 bg-[#FF4C00] hover:bg-[#E64400] text-white text-sm font-semibold rounded-xl transition-all mx-auto"
+                      className="mt-4 r-btn-primary mx-auto"
                     >
                       <Plus className="h-4 w-4" /> Add First Bike
                     </button>
@@ -234,62 +216,55 @@ export default function InventoryBikesPage() {
                 </tr>
               ) : (
                 bikes.map((bike) => (
-                  <tr
-                    key={bike.id}
-                    className="border-b border-[#F8F8F8] hover:bg-[#FAFAFA] transition-colors group"
-                  >
-                    <td className="px-5 py-4">
-                      <span className="text-sm font-bold text-[#FF4C00]">
+                  <tr key={bike.id} className="r-tr group">
+                    <td className="r-td">
+                      <span className="text-[13px] font-bold text-[#FF4C00] font-mono">
                         {bike.round_number}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <div>
-                        <p className="text-sm font-semibold text-[#0A0A0A]">
-                          {bike.bike_models?.name || "—"}
-                        </p>
-                        <p className="text-xs text-[#9A9A9A] capitalize">
-                          {bike.bike_models?.bike_category} · {bike.bike_models?.fuel_type}
-                        </p>
-                      </div>
+                    <td className="r-td">
+                      <p className="text-[13px] font-semibold text-[#0A0A0A]">
+                        {bike.bike_models?.name || "—"}
+                      </p>
+                      <p className="text-[11px] text-[#9A9A9A] capitalize">
+                        {bike.bike_models?.bike_category} · {bike.bike_models?.fuel_type}
+                      </p>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="r-td">
                       <div className="flex items-center gap-2">
                         {bike.bike_colors?.hex_code && (
                           <div
-                            className="w-4 h-4 rounded-full border border-[#E5E5E5] flex-shrink-0"
+                            className="w-3.5 h-3.5 rounded-full border border-[#E8E8E8] flex-shrink-0"
                             style={{ backgroundColor: bike.bike_colors.hex_code }}
                           />
                         )}
-                        <span className="text-sm text-[#4A4A4A]">
+                        <span className="text-[13px] text-[#4A4A4A]">
                           {bike.bike_colors?.name || "—"}
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm font-mono text-[#4A4A4A]">
+                    <td className="r-td">
+                      <span className="text-[12px] font-mono text-[#4A4A4A]">
                         {bike.chassis_number}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm font-mono text-[#4A4A4A]">
+                    <td className="r-td">
+                      <span className="text-[12px] font-mono text-[#4A4A4A]">
                         {bike.engine_number}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm font-semibold text-[#0A0A0A]">
+                    <td className="r-td">
+                      <span className="text-[13px] font-bold text-[#0A0A0A]">
                         Rs. {bike.selling_price.toLocaleString()}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_STYLES[bike.status]}`}
-                      >
+                    <td className="r-td">
+                      <span className={`r-badge text-[10px] font-bold border ${STATUS_STYLES[bike.status]}`}>
                         {STATUS_LABELS[bike.status]}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-sm text-[#6B6B6B]">
+                    <td className="r-td">
+                      <span className="text-[12px] text-[#6B6B6B]">
                         {new Date(bike.stock_date).toLocaleDateString("en-GB", {
                           day: "numeric",
                           month: "short",
@@ -297,7 +272,7 @@ export default function InventoryBikesPage() {
                         })}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="r-td">
                       <button className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[#F0F0F0] transition-all">
                         <MoreHorizontal className="h-4 w-4 text-[#6B6B6B]" />
                       </button>

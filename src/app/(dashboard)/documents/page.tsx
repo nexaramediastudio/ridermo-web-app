@@ -167,69 +167,75 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="space-y-5 max-w-[1200px]">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Documents</h2>
-        <p className="text-sm text-[#9A9A9A] mt-0.5">All invoices, payslips, cheque records and CR/plate documents</p>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-[#FF4C00]/10 flex items-center justify-center">
+          <FileText className="h-5 w-5 text-[#FF4C00]" />
+        </div>
+        <div>
+          <h1 className="r-page-title">Documents</h1>
+          <p className="r-page-sub">All invoices, payslips, cheque records and CR/plate documents</p>
+        </div>
       </div>
 
-      {/* Type tabs */}
-      <div className="flex items-center gap-1 bg-[#F5F5F5] rounded-xl p-1 w-fit flex-wrap">
-        <button
-          onClick={() => setActiveType("all")}
-          className={`flex items-center gap-2 h-8 px-3 rounded-lg text-xs font-semibold transition-all ${activeType === "all" ? "bg-white text-[#0A0A0A] shadow-sm" : "text-[#6B6B6B]"}`}
-        >
-          All
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeType === "all" ? "bg-[#FF4C00]/10 text-[#FF4C00]" : "bg-[#E5E5E5] text-[#6B6B6B]"}`}>{counts.all}</span>
-        </button>
-        {(Object.entries(TYPE_CONFIG) as [Exclude<DocType, "all">, typeof TYPE_CONFIG[Exclude<DocType, "all">]][]).map(([type, config]) => (
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="r-tabs">
           <button
-            key={type}
-            onClick={() => setActiveType(type)}
-            className={`flex items-center gap-2 h-8 px-3 rounded-lg text-xs font-semibold transition-all ${activeType === type ? "bg-white text-[#0A0A0A] shadow-sm" : "text-[#6B6B6B]"}`}
+            onClick={() => setActiveType("all")}
+            className={activeType === "all" ? "r-tab-on" : "r-tab-off"}
           >
-            <config.icon className="h-3.5 w-3.5" />
-            {config.label}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeType === type ? "bg-[#FF4C00]/10 text-[#FF4C00]" : "bg-[#E5E5E5] text-[#6B6B6B]"}`}>{counts[type]}</span>
+            All
+            <span className="ml-1 text-[10px] font-bold text-[#9A9A9A]">{counts.all}</span>
           </button>
-        ))}
-      </div>
+          {(Object.entries(TYPE_CONFIG) as [Exclude<DocType, "all">, typeof TYPE_CONFIG[Exclude<DocType, "all">]][]).map(([type, config]) => (
+            <button
+              key={type}
+              onClick={() => setActiveType(type)}
+              className={`${activeType === type ? "r-tab-on" : "r-tab-off"} flex items-center gap-1.5`}
+            >
+              <config.icon className="h-3 w-3" />
+              {config.label}
+              <span className="text-[10px] font-bold text-[#9A9A9A]">{counts[type]}</span>
+            </button>
+          ))}
+        </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#ABABAB]" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search documents..."
-          className="w-full h-9 pl-9 pr-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white"
-        />
+        <div className="relative flex-1 max-w-xs ml-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#ABABAB]" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search documents..."
+            className="r-input pl-9"
+          />
+        </div>
       </div>
 
       {/* Document list */}
       {loading ? (
-        <div className="space-y-2">
+        <div className="r-card overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-[#EFEFEF] p-4 animate-pulse">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[#F0F0F0] flex-shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-[#F0F0F0] rounded w-48" />
-                  <div className="h-3 bg-[#F0F0F0] rounded w-32" />
-                </div>
+            <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-[#F5F5F5] animate-pulse">
+              <div className="w-9 h-9 rounded-xl bg-[#F0F0F0] flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3.5 bg-[#F0F0F0] rounded w-48" />
+                <div className="h-3 bg-[#F0F0F0] rounded w-32" />
               </div>
             </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#EFEFEF] p-14 text-center">
-          <FileText className="h-12 w-12 mx-auto mb-3 text-[#E0E0E0]" />
-          <p className="text-sm font-semibold text-[#6B6B6B]">No documents found</p>
-          <p className="text-xs text-[#ABABAB] mt-1">Documents are created automatically as you use the system</p>
+        <div className="r-card p-14 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mx-auto mb-3">
+            <FileText className="h-7 w-7 text-[#ABABAB]" />
+          </div>
+          <p className="text-[13px] font-semibold text-[#4A4A4A]">No documents found</p>
+          <p className="text-[11px] text-[#ABABAB] mt-1">Documents are created automatically as you use the system</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-[#EFEFEF] overflow-hidden">
+        <div className="r-card overflow-hidden">
           <div className="divide-y divide-[#F5F5F5]">
             {filtered.map((doc) => {
               const config = TYPE_CONFIG[doc.type as Exclude<DocType, "all">];
@@ -238,60 +244,54 @@ export default function DocumentsPage() {
               return (
                 <div
                   key={`${doc.type}-${doc.id}`}
-                  className="flex items-center gap-4 px-5 py-4 hover:bg-[#FAFAFA] transition-colors group"
+                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#FAFAFA] transition-colors group"
                 >
-                  {/* Icon */}
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${config.bg}`}>
-                    <config.icon className={`h-5 w-5 ${config.color}`} />
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                    <config.icon className={`h-4 w-4 ${config.color}`} />
                   </div>
 
-                  {/* Details */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-[#0A0A0A]">{doc.title}</span>
+                      <span className="text-[13px] font-bold text-[#0A0A0A]">{doc.title}</span>
                       {doc.meta && (
-                        <span className="text-xs text-[#9A9A9A] bg-[#F5F5F5] px-2 py-0.5 rounded-full">{doc.meta}</span>
+                        <span className="text-[10px] text-[#9A9A9A] bg-[#F5F5F5] px-2 py-0.5 rounded-full font-medium">{doc.meta}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5">
-                      <span className="text-xs text-[#9A9A9A] flex items-center gap-1">
-                        <User className="h-3 w-3" /> {doc.subtitle}
+                      <span className="text-[11px] text-[#9A9A9A] flex items-center gap-1">
+                        <User className="h-2.5 w-2.5" /> {doc.subtitle}
                       </span>
-                      <span className="text-xs text-[#9A9A9A] flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
+                      <span className="text-[11px] text-[#9A9A9A] flex items-center gap-1">
+                        <Calendar className="h-2.5 w-2.5" />
                         {new Date(doc.date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </div>
                   </div>
 
-                  {/* Amount */}
                   {doc.amount !== undefined && (
                     <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-bold text-[#0A0A0A]">
+                      <span className="text-[13px] font-bold text-[#0A0A0A]">
                         Rs. {doc.amount.toLocaleString("en", { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                   )}
 
-                  {/* Status */}
                   {doc.status && (
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 ${doc.statusStyle}`}>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 ${doc.statusStyle}`}>
                       {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                     </span>
                   )}
 
-                  {/* Type badge */}
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 hidden sm:block ${config.bg} ${config.color}`}>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 hidden sm:inline ${config.bg} ${config.color}`}>
                     {config.label}
                   </span>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
-                    <button className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#F5F5F5] transition-all" title="Preview">
-                      <Eye className="h-4 w-4 text-[#9A9A9A]" />
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                    <button className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5]" title="Preview">
+                      <Eye className="h-3.5 w-3.5 text-[#9A9A9A]" />
                     </button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#FF4C00]/10 transition-all" title="Download PDF">
-                      <Download className="h-4 w-4 text-[#9A9A9A] hover:text-[#FF4C00]" />
+                    <button className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5]" title="Download">
+                      <Download className="h-3.5 w-3.5 text-[#9A9A9A]" />
                     </button>
                   </div>
                 </div>
@@ -299,10 +299,8 @@ export default function DocumentsPage() {
             })}
           </div>
 
-          {/* Footer count */}
           <div className="border-t border-[#F0F0F0] px-5 py-3 bg-[#FAFAFA] flex items-center justify-between">
-            <span className="text-xs text-[#9A9A9A]">{filtered.length} documents</span>
-            <span className="text-xs text-[#9A9A9A]">Showing most recent first</span>
+            <span className="text-[11px] text-[#ABABAB]">{filtered.length} documents · most recent first</span>
           </div>
         </div>
       )}

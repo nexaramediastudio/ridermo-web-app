@@ -170,58 +170,83 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div className="space-y-5 max-w-[900px]">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Notifications</h2>
-          <p className="text-sm text-[#9A9A9A] mt-0.5">
-            {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
-          </p>
+    <div className="space-y-6 max-w-[900px]">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#FF4C00]/10 flex items-center justify-center">
+            <Bell className="h-5 w-5 text-[#FF4C00]" />
+          </div>
+          <div>
+            <h1 className="r-page-title">Notifications</h1>
+            <p className="r-page-sub">
+              {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount !== 1 ? "s" : ""}` : "All caught up"}
+            </p>
+          </div>
         </div>
         {unreadCount > 0 && (
-          <button onClick={markAllRead} className="flex items-center gap-2 h-8 px-3 border border-[#E5E5E5] text-xs font-semibold text-[#4A4A4A] rounded-xl hover:bg-[#F5F5F5]">
+          <button onClick={markAllRead} className="r-btn-secondary">
             <CheckCheck className="h-3.5 w-3.5" /> Mark all read
           </button>
         )}
       </div>
 
       {/* System Alerts */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">System Alerts</h3>
+      <div className="space-y-2">
+        <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider px-0.5">System Alerts</p>
         {loading ? (
-          Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-16 bg-[#F5F5F5] rounded-2xl animate-pulse" />)
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-16 bg-[#F5F5F5] rounded-2xl animate-pulse" />
+          ))
         ) : (
           systemAlerts.map((alert, idx) => (
             <div
               key={idx}
-              className={`flex items-start gap-3 p-4 rounded-2xl border ${alert.type === "warning" ? "bg-amber-50 border-amber-100" : "bg-blue-50 border-blue-100"}`}
+              className={`flex items-start gap-3.5 p-4 rounded-2xl border ${
+                alert.type === "warning"
+                  ? "bg-amber-50 border-amber-200"
+                  : "bg-blue-50 border-blue-100"
+              }`}
             >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${alert.type === "warning" ? "bg-amber-100" : "bg-blue-100"}`}>
-                <alert.icon className={`h-4.5 w-4.5 ${alert.type === "warning" ? "text-amber-700" : "text-blue-700"}`} />
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                alert.type === "warning" ? "bg-amber-100" : "bg-blue-100"
+              }`}>
+                <alert.icon className={`h-4 w-4 ${alert.type === "warning" ? "text-amber-700" : "text-blue-600"}`} />
               </div>
               <div className="flex-1">
-                <p className={`text-sm font-semibold ${alert.type === "warning" ? "text-amber-800" : "text-blue-800"}`}>{alert.title}</p>
-                <p className={`text-xs mt-0.5 ${alert.type === "warning" ? "text-amber-700" : "text-blue-700"}`}>{alert.message}</p>
+                <p className={`text-[13px] font-semibold ${alert.type === "warning" ? "text-amber-800" : "text-blue-800"}`}>
+                  {alert.title}
+                </p>
+                <p className={`text-[11px] mt-0.5 ${alert.type === "warning" ? "text-amber-700" : "text-blue-600"}`}>
+                  {alert.message}
+                </p>
               </div>
               {alert.link && (
-                <a href={alert.link} className={`text-xs font-semibold underline ${alert.type === "warning" ? "text-amber-700" : "text-blue-700"}`}>View →</a>
+                <a
+                  href={alert.link}
+                  className={`text-[11px] font-semibold flex-shrink-0 ${alert.type === "warning" ? "text-amber-700" : "text-blue-600"}`}
+                >
+                  View →
+                </a>
               )}
             </div>
           ))
         )}
       </div>
 
-      {/* User notifications */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">Activity</h3>
+      {/* Activity feed */}
+      <div className="space-y-2">
+        <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider px-0.5">Activity</p>
         {notifications.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#EFEFEF] p-12 text-center">
-            <Bell className="h-10 w-10 mx-auto mb-3 text-[#E0E0E0]" />
-            <p className="text-sm font-semibold text-[#6B6B6B]">No notifications yet</p>
-            <p className="text-xs text-[#ABABAB] mt-1">Activity notifications will appear here</p>
+          <div className="r-card p-12 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mx-auto mb-3">
+              <Bell className="h-7 w-7 text-[#ABABAB]" />
+            </div>
+            <p className="text-[13px] font-semibold text-[#4A4A4A]">No notifications yet</p>
+            <p className="text-[11px] text-[#ABABAB] mt-1">Activity notifications will appear here</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-[#EFEFEF] overflow-hidden">
+          <div className="r-card overflow-hidden">
             <div className="divide-y divide-[#F5F5F5]">
               {notifications.map((notif) => {
                 const cfg = TYPE_CONFIG[notif.type];
@@ -229,18 +254,22 @@ export default function NotificationsPage() {
                   <button
                     key={notif.id}
                     onClick={() => markRead(notif.id)}
-                    className={`w-full flex items-start gap-4 px-5 py-4 text-left transition-colors hover:bg-[#FAFAFA] ${!notif.is_read ? "bg-[#FF4C00]/3" : ""}`}
+                    className={`w-full flex items-start gap-4 px-5 py-3.5 text-left transition-colors hover:bg-[#FAFAFA] ${!notif.is_read ? "bg-[#FF4C00]/[0.02]" : ""}`}
                   >
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.style.split(" ").slice(0, 1).join(" ")} border ${cfg.style.split(" ").slice(2).join(" ")}`}>
-                      <cfg.icon className={`h-4 w-4 ${cfg.style.split(" ")[1]}`} />
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border ${cfg.style}`}>
+                      <cfg.icon className={`h-3.5 w-3.5 ${cfg.style.split(" ")[1]}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${!notif.is_read ? "text-[#0A0A0A]" : "text-[#4A4A4A]"}`}>{notif.title}</p>
-                      {notif.message && <p className="text-xs text-[#9A9A9A] mt-0.5 truncate">{notif.message}</p>}
+                      <p className={`text-[13px] font-semibold ${!notif.is_read ? "text-[#0A0A0A]" : "text-[#4A4A4A]"}`}>
+                        {notif.title}
+                      </p>
+                      {notif.message && (
+                        <p className="text-[11px] text-[#9A9A9A] mt-0.5 truncate">{notif.message}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {!notif.is_read && <span className="w-2 h-2 rounded-full bg-[#FF4C00]" />}
-                      <span className="text-xs text-[#ABABAB]">
+                      {!notif.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[#FF4C00]" />}
+                      <span className="text-[11px] text-[#ABABAB]">
                         {new Date(notif.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                       </span>
                     </div>

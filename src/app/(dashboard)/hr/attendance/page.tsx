@@ -131,73 +131,70 @@ export default function AttendancePage() {
   const isToday = selectedDate === new Date().toISOString().split("T")[0];
 
   return (
-    <div className="space-y-5 max-w-[1000px]">
+    <div className="space-y-6 max-w-[1000px]">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2
-            className="text-xl font-bold text-[#0A0A0A]"
-            style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-          >
-            Attendance
-          </h2>
-          <p className="text-sm text-[#9A9A9A] mt-0.5">{employees.length} active employees</p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+            <Calendar className="h-5 w-5 text-emerald-600" />
+          </div>
+          <div>
+            <h1 className="r-page-title">Attendance</h1>
+            <p className="r-page-sub">{employees.length} active employees</p>
+          </div>
         </div>
         <button
           onClick={handleSave}
           disabled={saving || loading}
-          className="flex items-center gap-2 h-9 px-4 bg-[#FF4C00] hover:bg-[#E64400] text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-60"
+          className="r-btn-primary disabled:opacity-60"
         >
           <Save className="h-4 w-4" />
           {saving ? "Saving..." : hasExisting ? "Update Attendance" : "Save Attendance"}
         </button>
       </div>
 
-      {/* Date picker */}
-      <div className="bg-white rounded-2xl border border-[#EFEFEF] p-4 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <button onClick={() => changeDate(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E5E5E5] hover:bg-[#F5F5F5] transition-all">
+      {/* Date picker + summary */}
+      <div className="r-card-p flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => changeDate(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E8E8E8] hover:bg-[#F5F5F5] transition-all">
             <ChevronLeft className="h-4 w-4 text-[#6B6B6B]" />
           </button>
-          <div className="flex items-center gap-2 min-w-[220px]">
-            <Calendar className="h-4 w-4 text-[#FF4C00]" />
-            <span className="text-sm font-semibold text-[#0A0A0A]">{dateDisplay}</span>
-            {isToday && <span className="text-[10px] font-bold px-2 py-0.5 bg-[#FF4C00] text-white rounded-full">Today</span>}
+          <div className="flex items-center gap-2 px-3">
+            <Calendar className="h-3.5 w-3.5 text-[#FF4C00]" />
+            <span className="text-[13px] font-semibold text-[#0A0A0A]">{dateDisplay}</span>
+            {isToday && <span className="r-badge bg-[#FF4C00] text-white">Today</span>}
           </div>
-          <button onClick={() => changeDate(1)} disabled={isToday} className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E5E5E5] hover:bg-[#F5F5F5] disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+          <button onClick={() => changeDate(1)} disabled={isToday} className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E8E8E8] hover:bg-[#F5F5F5] disabled:opacity-40 disabled:cursor-not-allowed transition-all">
             <ChevronRight className="h-4 w-4 text-[#6B6B6B]" />
           </button>
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-8 px-3 rounded-xl border border-[#E5E5E5] text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white"
+            className="r-input w-auto"
           />
         </div>
 
-        {/* Summary chips */}
         <div className="flex items-center gap-2 flex-wrap ml-auto">
           {[
-            { label: "Present", value: counts.present, color: "bg-emerald-50 text-emerald-700" },
-            { label: "Absent", value: counts.absent, color: "bg-red-50 text-red-600" },
-            { label: "Half Day", value: counts.half_day, color: "bg-amber-50 text-amber-700" },
-            { label: "Leave", value: counts.leave, color: "bg-blue-50 text-blue-700" },
-          ].map(({ label, value, color }) => value > 0 && (
-            <span key={label} className={`text-xs font-semibold px-2.5 py-1 rounded-full ${color}`}>
-              {value} {label}
-            </span>
-          ))}
+            { label: "Present",  value: counts.present,  cls: "r-badge-green" },
+            { label: "Absent",   value: counts.absent,   cls: "r-badge-red" },
+            { label: "Half Day", value: counts.half_day, cls: "r-badge-amber" },
+            { label: "Leave",    value: counts.leave,    cls: "r-badge-blue" },
+          ].map(({ label, value, cls }) => value > 0 ? (
+            <span key={label} className={`${cls} text-[11px] font-bold`}>{value} {label}</span>
+          ) : null)}
         </div>
       </div>
 
       {/* Quick mark all */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider mr-1">Mark all as:</span>
+        <span className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider mr-1">Mark all:</span>
         {STATUS_OPTIONS.slice(0, 3).map((s) => (
           <button
             key={s.value}
             onClick={() => markAll(s.value)}
-            className={`flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-semibold border transition-all hover:opacity-80 ${s.bg} ${s.color}`}
+            className={`flex items-center gap-1.5 h-7 px-3 rounded-lg text-[11px] font-semibold border transition-all hover:opacity-80 ${s.bg} ${s.color}`}
           >
             <s.icon className="h-3 w-3" />
             {s.label}
@@ -206,69 +203,63 @@ export default function AttendancePage() {
       </div>
 
       {/* Attendance List */}
-      <div className="bg-white rounded-2xl border border-[#EFEFEF] overflow-hidden">
+      <div className="r-card overflow-hidden">
         {loading ? (
           <div className="divide-y divide-[#F5F5F5]">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 p-4 animate-pulse">
-                <div className="w-10 h-10 rounded-full bg-[#F0F0F0]" />
+              <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
+                <div className="w-9 h-9 rounded-full bg-[#F0F0F0]" />
                 <div className="flex-1 space-y-2">
                   <div className="h-4 bg-[#F0F0F0] rounded w-40" />
                   <div className="h-3 bg-[#F0F0F0] rounded w-24" />
-                </div>
-                <div className="flex gap-2">
-                  {Array.from({ length: 3 }).map((_, j) => <div key={j} className="h-8 w-20 bg-[#F0F0F0] rounded-xl" />)}
                 </div>
               </div>
             ))}
           </div>
         ) : employees.length === 0 ? (
-          <div className="p-12 text-center text-[#ABABAB]">
-            <p className="text-sm font-medium">No active employees</p>
-            <p className="text-xs mt-1">Add employees in the Employees section first</p>
+          <div className="p-12 text-center">
+            <p className="text-[13px] font-medium text-[#6B6B6B]">No active employees</p>
+            <p className="text-[11px] text-[#ABABAB] mt-1">Add employees in the Employees section first</p>
           </div>
         ) : (
           <div className="divide-y divide-[#F5F5F5]">
             {employees.map((emp) => {
               const rec = attendance[emp.id];
               const currentStatus = rec?.status || "present";
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const style = getStatusStyle(currentStatus);
 
               return (
-                <div key={emp.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#FAFAFA] transition-colors">
-                  {/* Avatar */}
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold ${emp.type === "director" ? "bg-[#FF4C00]/15 text-[#FF4C00]" : "bg-[#F5F5F5] text-[#6B6B6B]"}`}>
+                <div key={emp.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#FAFAFA] transition-colors">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${emp.type === "director" ? "bg-[#FF4C00]/15 text-[#FF4C00]" : "bg-[#F5F5F5] text-[#6B6B6B]"}`}>
                     {emp.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
 
-                  {/* Name */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{emp.full_name}</p>
-                    <p className="text-xs text-[#9A9A9A] capitalize">{emp.type}{emp.employee_code ? ` · ${emp.employee_code}` : ""}</p>
+                  <div className="w-44 flex-shrink-0 min-w-0">
+                    <p className="text-[13px] font-semibold text-[#0A0A0A] truncate">{emp.full_name}</p>
+                    <p className="text-[11px] text-[#9A9A9A] capitalize">{emp.type}{emp.employee_code ? ` · ${emp.employee_code}` : ""}</p>
                   </div>
 
-                  {/* Status buttons */}
-                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <div className="flex items-center gap-1 flex-wrap flex-1">
                     {STATUS_OPTIONS.map((s) => (
                       <button
                         key={s.value}
                         onClick={() => setStatus(emp.id, s.value)}
-                        className={`flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold border transition-all ${
+                        className={`flex items-center gap-1 h-7 px-2.5 rounded-lg text-[11px] font-semibold border transition-all ${
                           currentStatus === s.value
-                            ? `${s.bg} ${s.color} shadow-sm`
-                            : "border-transparent text-[#ABABAB] hover:border-[#E5E5E5] hover:text-[#6B6B6B]"
+                            ? `${s.bg} ${s.color}`
+                            : "border-transparent text-[#ABABAB] hover:border-[#E8E8E8] hover:text-[#6B6B6B] hover:bg-[#F5F5F5]"
                         }`}
                       >
-                        <s.icon className="h-3.5 w-3.5" />
+                        <s.icon className="h-3 w-3" />
                         <span className="hidden sm:inline">{s.label}</span>
                       </button>
                     ))}
                   </div>
 
-                  {/* OT hours (only for present) */}
                   {currentStatus === "present" && (
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="text-xs text-[#9A9A9A] font-medium">OT</span>
+                      <span className="text-[11px] text-[#9A9A9A] font-medium">OT</span>
                       <input
                         type="number"
                         min="0"
@@ -282,9 +273,9 @@ export default function AttendancePage() {
                           }))
                         }
                         placeholder="0"
-                        className="w-14 h-8 px-2 rounded-xl border border-[#E5E5E5] text-xs text-center focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]"
+                        className="w-14 h-7 px-2 rounded-lg border border-[#E8E8E8] text-[11px] text-center focus:outline-none focus:border-[#FF4C00]"
                       />
-                      <span className="text-xs text-[#9A9A9A]">hrs</span>
+                      <span className="text-[11px] text-[#9A9A9A]">hrs</span>
                     </div>
                   )}
                 </div>
@@ -294,13 +285,12 @@ export default function AttendancePage() {
         )}
       </div>
 
-      {/* Save button bottom */}
       {employees.length > 0 && (
         <div className="flex justify-end">
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 h-10 px-6 bg-[#FF4C00] hover:bg-[#E64400] text-white text-sm font-bold rounded-xl transition-all disabled:opacity-60"
+            className="r-btn-primary disabled:opacity-60"
           >
             <Save className="h-4 w-4" />
             {saving ? "Saving..." : "Save Attendance"}

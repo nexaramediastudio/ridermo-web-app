@@ -725,23 +725,32 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("company");
 
   return (
-    <div className="space-y-5 max-w-[1000px]">
-      <div>
-        <h2 className="text-xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Settings</h2>
-        <p className="text-sm text-[#9A9A9A] mt-0.5">Configure RIDERMO ERP</p>
+    <div className="space-y-6 max-w-[1000px]">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-[#F5F5F5] flex items-center justify-center">
+          <Settings2 className="h-5 w-5 text-[#6B6B6B]" />
+        </div>
+        <div>
+          <h1 className="r-page-title">Settings</h1>
+          <p className="r-page-sub">Configure RIDERMO ERP system</p>
+        </div>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex gap-5">
         {/* Sidebar */}
-        <div className="w-52 flex-shrink-0">
-          <nav className="space-y-1">
+        <div className="w-48 flex-shrink-0">
+          <nav className="space-y-0.5">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id ? "bg-[#FF4C00]/8 text-[#FF4C00]" : "text-[#4A4A4A] hover:bg-[#F5F5F5]"}`}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all ${
+                  activeTab === tab.id
+                    ? "bg-[#FF4C00]/8 text-[#FF4C00]"
+                    : "text-[#4A4A4A] hover:bg-[#F5F5F5] hover:text-[#0A0A0A]"
+                }`}
               >
-                <tab.icon className={`h-4 w-4 ${activeTab === tab.id ? "text-[#FF4C00]" : "text-[#9A9A9A]"}`} />
+                <tab.icon className={`h-3.5 w-3.5 flex-shrink-0 ${activeTab === tab.id ? "text-[#FF4C00]" : "text-[#9A9A9A]"}`} />
                 {tab.label}
               </button>
             ))}
@@ -749,7 +758,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 bg-white rounded-2xl border border-[#EFEFEF] p-6">
+        <div className="flex-1 r-card p-6">
           {activeTab === "company" && <CompanySettings />}
           {activeTab === "bikes" && <BikeModelsSettings />}
           {activeTab === "finance" && (

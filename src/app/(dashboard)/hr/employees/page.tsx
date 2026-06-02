@@ -65,26 +65,38 @@ export default function EmployeesPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-[1200px]">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2
-            className="text-xl font-bold text-[#0A0A0A]"
-            style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-          >
-            Employees
-          </h2>
-          <p className="text-sm text-[#9A9A9A] mt-0.5">
-            {active} active · {directors} directors
-          </p>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#FF4C00]/10 flex items-center justify-center">
+            <User className="h-5 w-5 text-[#FF4C00]" />
+          </div>
+          <div>
+            <h1 className="r-page-title">Employees</h1>
+            <p className="r-page-sub">{active} active · {directors} director{directors !== 1 ? "s" : ""}</p>
+          </div>
         </div>
         <button
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 h-9 px-4 bg-[#FF4C00] hover:bg-[#E64400] text-white text-sm font-semibold rounded-xl transition-all"
+          className="r-btn-primary"
         >
           <Plus className="h-4 w-4" /> Add Employee
         </button>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: "Total Employees",  value: employees.length, color: "text-[#0A0A0A]" },
+          { label: "Active",           value: active,           color: "text-emerald-600" },
+          { label: "Directors",        value: directors,        color: "text-[#FF4C00]" },
+        ].map((k) => (
+          <div key={k.label} className="r-kpi">
+            <p className="r-page-sub mb-2">{k.label}</p>
+            <p className={`text-2xl font-bold font-display ${k.color}`}>{k.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}
@@ -95,15 +107,15 @@ export default function EmployeesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, phone, NIC..."
-            className="w-full h-9 pl-9 pr-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white"
+            className="r-input pl-9 max-w-sm"
           />
         </div>
-        <div className="flex items-center gap-1 bg-[#F5F5F5] rounded-xl p-1">
+        <div className="r-tabs">
           {(["all", "director", "worker"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`h-7 px-3 rounded-lg text-xs font-semibold transition-all capitalize ${typeFilter === t ? "bg-white text-[#0A0A0A] shadow-sm" : "text-[#6B6B6B]"}`}
+              className={typeFilter === t ? "r-tab-on" : "r-tab-off"}
             >
               {t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1) + "s"}
             </button>
@@ -115,9 +127,9 @@ export default function EmployeesPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-[#EFEFEF] p-5 animate-pulse">
+            <div key={i} className="r-card p-5 animate-pulse">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-[#F0F0F0]" />
+                <div className="w-12 h-12 rounded-2xl bg-[#F0F0F0]" />
                 <div className="space-y-2 flex-1">
                   <div className="h-4 bg-[#F0F0F0] rounded w-3/4" />
                   <div className="h-3 bg-[#F0F0F0] rounded w-1/2" />
@@ -127,11 +139,13 @@ export default function EmployeesPage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#EFEFEF] p-16 text-center">
-          <User className="h-12 w-12 mx-auto mb-3 text-[#E0E0E0]" />
-          <p className="text-sm font-semibold text-[#6B6B6B]">No employees found</p>
-          <p className="text-xs text-[#ABABAB] mt-1">Add your first employee to get started</p>
-          <button onClick={() => setShowAdd(true)} className="mt-4 flex items-center gap-2 h-9 px-4 bg-[#FF4C00] text-white text-sm font-semibold rounded-xl mx-auto">
+        <div className="r-card p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mx-auto mb-3">
+            <User className="h-7 w-7 text-[#ABABAB]" />
+          </div>
+          <p className="text-[13px] font-semibold text-[#4A4A4A]">No employees found</p>
+          <p className="text-[11px] text-[#ABABAB] mt-1">Add your first employee to get started</p>
+          <button onClick={() => setShowAdd(true)} className="mt-4 r-btn-primary mx-auto">
             <Plus className="h-4 w-4" /> Add Employee
           </button>
         </div>
@@ -140,7 +154,7 @@ export default function EmployeesPage() {
           {filtered.map((emp) => (
             <div
               key={emp.id}
-              className={`bg-white rounded-2xl border p-5 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.07)] ${emp.is_active ? "border-[#EFEFEF]" : "border-[#F5F5F5] opacity-60"}`}
+              className={`r-card p-5 transition-colors hover:border-[#D0D0D0] ${!emp.is_active ? "opacity-60" : ""}`}
             >
               <div className="flex items-start gap-3">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 text-base font-bold ${emp.type === "director" ? "bg-[#FF4C00]/15 text-[#FF4C00]" : "bg-[#F5F5F5] text-[#6B6B6B]"}`}>
@@ -241,26 +255,32 @@ function AddEmployeeModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#EFEFEF] z-10 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
-          <h3 className="text-lg font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Add Employee</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#F5F5F5]"><X className="h-4 w-4 text-[#6B6B6B]" /></button>
+    <div className="r-modal-overlay">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="r-modal relative max-w-lg w-full">
+        <div className="r-modal-header">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#FF4C00]/10 flex items-center justify-center">
+              <User className="h-4 w-4 text-[#FF4C00]" />
+            </div>
+            <h3 className="text-[15px] font-bold text-[#0A0A0A] font-display">Add Employee</h3>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5]">
+            <X className="h-4 w-4 text-[#6B6B6B]" />
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Employee Type */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[#1A1A1A]">Employee Type</label>
+        <form onSubmit={handleSubmit} className="r-modal-body">
+          <div>
+            <label className="r-label">Employee Type</label>
             <div className="grid grid-cols-2 gap-2">
               {(["worker", "director"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setForm({ ...form, type: t })}
-                  className={`h-10 rounded-xl border-2 text-sm font-semibold transition-all capitalize ${form.type === t ? "border-[#FF4C00] bg-[#FF4C00]/5 text-[#FF4C00]" : "border-[#E5E5E5] text-[#4A4A4A]"}`}
+                  className={`h-9 rounded-xl border-2 text-[13px] font-semibold transition-all capitalize ${form.type === t ? "border-[#FF4C00] bg-[#FF4C00]/5 text-[#FF4C00]" : "border-[#E8E8E8] text-[#4A4A4A]"}`}
                 >
-                  {t === "director" && <Star className="h-3.5 w-3.5 inline mr-1 fill-current" />}
+                  {t === "director" && <Star className="h-3 w-3 inline mr-1 fill-current" />}
                   {t.charAt(0).toUpperCase() + t.slice(1)}
                 </button>
               ))}
@@ -268,51 +288,50 @@ function AddEmployeeModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Full Name <span className="text-[#FF4C00]">*</span></label>
-              <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required placeholder="Employee full name" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+            <div className="col-span-2">
+              <label className="r-label">Full Name <span className="text-[#FF4C00]">*</span></label>
+              <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required placeholder="Employee full name" className="r-input" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Employee Code</label>
-              <input value={form.employee_code} onChange={(e) => setForm({ ...form, employee_code: e.target.value })} placeholder="EMP001" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] uppercase" />
+            <div>
+              <label className="r-label">Employee Code</label>
+              <input value={form.employee_code} onChange={(e) => setForm({ ...form, employee_code: e.target.value })} placeholder="EMP001" className="r-input uppercase" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Phone <span className="text-[#FF4C00]">*</span></label>
-              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="07X XXX XXXX" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+            <div>
+              <label className="r-label">Phone <span className="text-[#FF4C00]">*</span></label>
+              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="07X XXX XXXX" className="r-input" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">NIC</label>
-              <input value={form.nic} onChange={(e) => setForm({ ...form, nic: e.target.value })} placeholder="XXXXXXXXXX" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+            <div>
+              <label className="r-label">NIC</label>
+              <input value={form.nic} onChange={(e) => setForm({ ...form, nic: e.target.value })} placeholder="XXXXXXXXXX" className="r-input" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Designation</label>
-              <input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="e.g. Sales Executive" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+            <div>
+              <label className="r-label">Designation</label>
+              <input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="e.g. Sales Executive" className="r-input" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Department</label>
-              <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="e.g. Sales" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+            <div>
+              <label className="r-label">Department</label>
+              <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="e.g. Sales" className="r-input" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Basic Salary (Rs.)</label>
-              <input type="number" value={form.basic_salary} onChange={(e) => setForm({ ...form, basic_salary: e.target.value })} placeholder="0" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+            <div>
+              <label className="r-label">Basic Salary (Rs.)</label>
+              <input type="number" value={form.basic_salary} onChange={(e) => setForm({ ...form, basic_salary: e.target.value })} placeholder="0" className="r-input" />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Join Date</label>
-              <input type="date" value={form.join_date} onChange={(e) => setForm({ ...form, join_date: e.target.value })} className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white" />
+            <div>
+              <label className="r-label">Join Date</label>
+              <input type="date" value={form.join_date} onChange={(e) => setForm({ ...form, join_date: e.target.value })} className="r-input" />
             </div>
-            <div className="col-span-2 space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Address</label>
-              <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+            <div className="col-span-2">
+              <label className="r-label">Address</label>
+              <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" className="r-input" />
             </div>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 h-10 rounded-xl border border-[#E5E5E5] text-sm font-semibold text-[#4A4A4A] hover:bg-[#F5F5F5]">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 h-10 bg-[#FF4C00] hover:bg-[#E64400] text-white text-sm font-semibold rounded-xl disabled:opacity-60">
-              {saving ? "Saving..." : "Add Employee"}
-            </button>
           </div>
         </form>
+        <div className="r-modal-footer">
+          <button type="button" onClick={onClose} className="r-btn-secondary">Cancel</button>
+          <button type="submit" form="emp-form" disabled={saving} onClick={handleSubmit as unknown as React.MouseEventHandler} className="r-btn-primary disabled:opacity-60">
+            {saving ? "Saving..." : "Add Employee"}
+          </button>
+        </div>
       </div>
     </div>
   );

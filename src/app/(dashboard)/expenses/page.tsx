@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, Wallet, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Wallet, X, ChevronLeft, ChevronRight, Receipt, TrendingDown } from "lucide-react";
 
 type ExpenseCategory = "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "other";
 
@@ -17,15 +17,17 @@ interface Expense {
   created_at: string;
 }
 
-const CATEGORY_CONFIG: Record<ExpenseCategory, { label: string; color: string; bg: string }> = {
-  rent: { label: "Rent", color: "text-purple-700", bg: "bg-purple-50" },
-  utilities: { label: "Utilities", color: "text-blue-700", bg: "bg-blue-50" },
-  salary: { label: "Salary", color: "text-emerald-700", bg: "bg-emerald-50" },
-  broker_commission: { label: "Broker Commission", color: "text-orange-700", bg: "bg-orange-50" },
-  bonus: { label: "Bonus", color: "text-amber-700", bg: "bg-amber-50" },
-  petty_cash: { label: "Petty Cash", color: "text-gray-700", bg: "bg-gray-100" },
-  other: { label: "Other", color: "text-slate-700", bg: "bg-slate-50" },
+const CATEGORY_CONFIG: Record<ExpenseCategory, { label: string; badge: string }> = {
+  rent:              { label: "Rent",              badge: "r-badge-purple" },
+  utilities:         { label: "Utilities",         badge: "r-badge-blue" },
+  salary:            { label: "Salary",            badge: "r-badge-green" },
+  broker_commission: { label: "Broker Commission", badge: "r-badge-orange" },
+  bonus:             { label: "Bonus",             badge: "r-badge-amber" },
+  petty_cash:        { label: "Petty Cash",        badge: "r-badge-gray" },
+  other:             { label: "Other",             badge: "r-badge-gray" },
 };
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 export default function ExpensesPage() {
   const now = new Date();
@@ -36,8 +38,6 @@ export default function ExpensesPage() {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<"all" | ExpenseCategory>("all");
   const [showAdd, setShowAdd] = useState(false);
-
-  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
   const loadExpenses = useCallback(async () => {
     setLoading(true);
@@ -72,126 +72,212 @@ export default function ExpensesPage() {
     return matchSearch && matchCat;
   });
 
-  const totalAmount = filtered.reduce((sum, e) => sum + e.amount, 0);
+  const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const filteredTotal = filtered.reduce((sum, e) => sum + e.amount, 0);
+
   const byCategory = Object.keys(CATEGORY_CONFIG).reduce((acc, cat) => {
     acc[cat] = expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amount, 0);
     return acc;
   }, {} as Record<string, number>);
 
   return (
-    <div className="space-y-5 max-w-[1200px]">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Expenses</h2>
-          <p className="text-sm text-[#9A9A9A] mt-0.5">{expenses.length} entries this month</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+            <TrendingDown className="h-5 w-5 text-red-500" />
+          </div>
+          <div>
+            <h1 className="r-page-title">Expenses</h1>
+            <p className="r-page-sub">{expenses.length} entries · {MONTHS[month - 1]} {year}</p>
+          </div>
         </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 h-9 px-4 bg-[#FF4C00] hover:bg-[#E64400] text-white text-sm font-semibold rounded-xl transition-all">
-          <Plus className="h-4 w-4" /> Add Expense
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Month selector */}
+          <div className="flex items-center gap-1 bg-[#F0F0F0] rounded-xl p-1">
+            <button onClick={() => changeMonth(-1)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white transition-colors">
+              <ChevronLeft className="h-4 w-4 text-[#6B6B6B]" />
+            </button>
+            <span className="text-[13px] font-bold text-[#0A0A0A] px-3 min-w-[120px] text-center">{MONTHS[month - 1]} {year}</span>
+            <button onClick={() => changeMonth(1)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white transition-colors">
+              <ChevronRight className="h-4 w-4 text-[#6B6B6B]" />
+            </button>
+          </div>
+          <button onClick={() => setShowAdd(true)} className="r-btn-primary">
+            <Plus className="h-4 w-4" /> Add Expense
+          </button>
+        </div>
       </div>
 
-      {/* Month selector */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="bg-white rounded-2xl border border-[#EFEFEF] p-3 flex items-center gap-3">
-          <button onClick={() => changeMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E5E5E5] hover:bg-[#F5F5F5]"><ChevronLeft className="h-4 w-4 text-[#6B6B6B]" /></button>
-          <span className="text-sm font-bold text-[#0A0A0A] w-28 text-center">{MONTHS[month - 1]} {year}</span>
-          <button onClick={() => changeMonth(1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E5E5E5] hover:bg-[#F5F5F5]"><ChevronRight className="h-4 w-4 text-[#6B6B6B]" /></button>
+      {/* KPI row */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="r-kpi col-span-1">
+          <div className="flex items-center justify-between mb-3">
+            <span className="r-page-sub">Total This Month</span>
+            <Wallet className="h-4 w-4 text-[#ABABAB]" />
+          </div>
+          <p className="text-2xl font-bold font-display text-[#FF4C00]">Rs. {totalAmount.toLocaleString("en", { maximumFractionDigits: 0 })}</p>
         </div>
-        <div className="bg-[#FF4C00]/5 border border-[#FF4C00]/20 rounded-2xl p-3 px-4">
-          <p className="text-xs text-[#9A9A9A] font-medium">Total Expenses</p>
-          <p className="text-lg font-bold text-[#FF4C00]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Rs. {totalAmount.toLocaleString()}</p>
+        <div className="r-kpi">
+          <div className="flex items-center justify-between mb-3">
+            <span className="r-page-sub">Entries</span>
+            <Receipt className="h-4 w-4 text-[#ABABAB]" />
+          </div>
+          <p className="text-2xl font-bold font-display text-[#0A0A0A]">{expenses.length}</p>
+        </div>
+        <div className="r-kpi">
+          <div className="flex items-center justify-between mb-3">
+            <span className="r-page-sub">Largest Category</span>
+            <TrendingDown className="h-4 w-4 text-[#ABABAB]" />
+          </div>
+          <p className="text-[13px] font-bold text-[#0A0A0A]">
+            {Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0]
+              ? CATEGORY_CONFIG[Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0][0] as ExpenseCategory]?.label
+              : "—"}
+          </p>
         </div>
       </div>
 
       {/* Category breakdown */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => {
-          const amount = byCategory[key] || 0;
-          if (amount === 0) return null;
-          return (
-            <button
-              key={key}
-              onClick={() => setCatFilter(catFilter === key as ExpenseCategory ? "all" : key as ExpenseCategory)}
-              className={`p-3 rounded-xl border transition-all text-left ${catFilter === key ? "border-[#FF4C00] shadow-[0_0_0_2px_rgba(255,76,0,0.1)]" : "border-[#EFEFEF] bg-white hover:border-[#E0E0E0]"}`}
-            >
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
-              <p className="text-sm font-bold text-[#0A0A0A] mt-2">Rs. {amount.toLocaleString("en", { maximumFractionDigits: 0 })}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Search + filter */}
-      <div className="flex items-center gap-3">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#ABABAB]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search description..." className="w-full h-9 pl-9 pr-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white" />
+      {Object.entries(byCategory).some(([, v]) => v > 0) && (
+        <div className="r-card-p">
+          <p className="r-section-title mb-3">Breakdown by Category</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => {
+              const amount = byCategory[key] || 0;
+              if (amount === 0) return null;
+              const pct = totalAmount ? Math.round((amount / totalAmount) * 100) : 0;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setCatFilter(catFilter === key as ExpenseCategory ? "all" : key as ExpenseCategory)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-all ${
+                    catFilter === key
+                      ? "border-[#FF4C00] bg-[#FF4C00]/5"
+                      : "border-[#E8E8E8] bg-white hover:border-[#D0D0D0]"
+                  }`}
+                >
+                  <span className={`${cfg.badge} text-[10px] font-bold px-2 py-0.5 rounded-full`}>{cfg.label}</span>
+                  <span className="text-[12px] font-bold text-[#0A0A0A]">Rs. {amount.toLocaleString("en", { maximumFractionDigits: 0 })}</span>
+                  <span className="text-[10px] text-[#ABABAB]">{pct}%</span>
+                </button>
+              );
+            })}
+            {catFilter !== "all" && (
+              <button onClick={() => setCatFilter("all")} className="flex items-center gap-1 px-3 py-2 rounded-xl border border-[#E8E8E8] text-[11px] text-[#9A9A9A] hover:bg-[#F5F5F5]">
+                <X className="h-3 w-3" /> Clear
+              </button>
+            )}
+          </div>
         </div>
-        {catFilter !== "all" && (
-          <button onClick={() => setCatFilter("all")} className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-[#E5E5E5] text-sm text-[#6B6B6B] hover:bg-[#F5F5F5]">
-            <X className="h-3.5 w-3.5" /> Clear filter
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-[#EFEFEF] overflow-hidden">
-        <table className="w-full">
+      <div className="r-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#F0F0F0] flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#ABABAB]" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search description..."
+              className="r-input pl-9"
+            />
+          </div>
+          <span className="ml-auto text-[11px] text-[#ABABAB] font-medium">{filtered.length} entries</span>
+        </div>
+
+        <table className="r-table">
           <thead>
-            <tr className="border-b border-[#F0F0F0]">
-              {["Date", "Category", "Description", "Amount", ""].map((h) => (
-                <th key={h} className="text-left px-5 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">{h}</th>
-              ))}
+            <tr className="r-thead-row">
+              <th className="r-th">Date</th>
+              <th className="r-th">Category</th>
+              <th className="r-th">Description</th>
+              <th className="r-th">Notes</th>
+              <th className="r-th text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i} className="border-b border-[#F8F8F8]">
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-[#F5F5F5]">
                   {Array.from({ length: 5 }).map((_, j) => (
-                    <td key={j} className="px-5 py-4"><div className="h-4 bg-[#F0F0F0] rounded animate-pulse" /></td>
+                    <td key={j} className="r-td"><div className="h-4 bg-[#F0F0F0] rounded animate-pulse" /></td>
                   ))}
                 </tr>
               ))
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-14 text-center">
-                <Wallet className="h-10 w-10 mx-auto mb-3 text-[#E0E0E0]" />
-                <p className="text-sm font-semibold text-[#6B6B6B]">No expenses this month</p>
-                <button onClick={() => setShowAdd(true)} className="mt-3 flex items-center gap-2 h-8 px-4 bg-[#FF4C00] text-white text-xs font-semibold rounded-xl mx-auto"><Plus className="h-3.5 w-3.5" /> Add Expense</button>
-              </td></tr>
+              <tr>
+                <td colSpan={5} className="px-5 py-16 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mx-auto mb-3">
+                    <Wallet className="h-7 w-7 text-[#ABABAB]" />
+                  </div>
+                  <p className="text-[13px] font-semibold text-[#4A4A4A]">No expenses this month</p>
+                  <button onClick={() => setShowAdd(true)} className="mt-3 r-btn-primary mx-auto">
+                    <Plus className="h-3.5 w-3.5" /> Add Expense
+                  </button>
+                </td>
+              </tr>
             ) : (
               filtered.map((exp) => {
                 const cfg = CATEGORY_CONFIG[exp.category];
                 return (
-                  <tr key={exp.id} className="border-b border-[#F8F8F8] hover:bg-[#FAFAFA] transition-colors">
-                    <td className="px-5 py-4"><span className="text-sm text-[#6B6B6B]">{new Date(exp.expense_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span></td>
-                    <td className="px-5 py-4"><span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.color}`}>{cfg.label}</span></td>
-                    <td className="px-5 py-4"><span className="text-sm text-[#0A0A0A]">{exp.description}</span></td>
-                    <td className="px-5 py-4"><span className="text-sm font-bold text-[#0A0A0A]">Rs. {exp.amount.toLocaleString()}</span></td>
-                    <td className="px-5 py-4">{exp.notes && <span className="text-xs text-[#9A9A9A] italic">{exp.notes}</span>}</td>
+                  <tr key={exp.id} className="r-tr">
+                    <td className="r-td">
+                      <span className="text-[12px] text-[#6B6B6B]">
+                        {new Date(exp.expense_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                    </td>
+                    <td className="r-td">
+                      <span className={`${cfg.badge} text-[10px]`}>{cfg.label}</span>
+                    </td>
+                    <td className="r-td">
+                      <span className="text-[13px] text-[#0A0A0A] font-medium">{exp.description}</span>
+                    </td>
+                    <td className="r-td">
+                      {exp.notes && <span className="text-[11px] text-[#9A9A9A] italic">{exp.notes}</span>}
+                    </td>
+                    <td className="r-td text-right">
+                      <span className="text-[13px] font-bold text-[#0A0A0A]">
+                        Rs. {exp.amount.toLocaleString("en", { maximumFractionDigits: 0 })}
+                      </span>
+                    </td>
                   </tr>
                 );
               })
             )}
           </tbody>
         </table>
+
         {filtered.length > 0 && (
-          <div className="border-t border-[#F0F0F0] px-5 py-3 flex items-center justify-between bg-[#FAFAFA]">
-            <span className="text-xs text-[#9A9A9A] font-medium">{filtered.length} entries</span>
-            <span className="text-sm font-bold text-[#0A0A0A]">Total: Rs. {filtered.reduce((s, e) => s + e.amount, 0).toLocaleString()}</span>
+          <div className="px-5 py-3 border-t border-[#F0F0F0] bg-[#FAFAFA] flex items-center justify-between">
+            <span className="text-[11px] text-[#ABABAB]">{filtered.length} entries</span>
+            <span className="text-[13px] font-bold text-[#0A0A0A]">
+              Total: Rs. {filteredTotal.toLocaleString("en", { maximumFractionDigits: 0 })}
+            </span>
           </div>
         )}
       </div>
 
       {showAdd && (
-        <AddExpenseModal onClose={() => setShowAdd(false)} onSuccess={() => { setShowAdd(false); loadExpenses(); }} />
+        <AddExpenseModal
+          onClose={() => setShowAdd(false)}
+          onSuccess={() => { setShowAdd(false); loadExpenses(); }}
+        />
       )}
     </div>
   );
 }
 
 function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({ category: "petty_cash", description: "", amount: "", expense_date: new Date().toISOString().split("T")[0], notes: "" });
+  const [form, setForm] = useState({
+    category: "petty_cash",
+    description: "",
+    amount: "",
+    expense_date: new Date().toISOString().split("T")[0],
+    notes: "",
+  });
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -205,43 +291,79 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[#EFEFEF] z-10">
-        <div className="flex items-center justify-between p-6 border-b border-[#F0F0F0]">
-          <h3 className="text-lg font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Add Expense</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#F5F5F5]"><X className="h-4 w-4 text-[#6B6B6B]" /></button>
+    <div className="r-modal-overlay">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="r-modal relative max-w-md w-full">
+        <div className="r-modal-header">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
+              <Plus className="h-4 w-4 text-red-500" />
+            </div>
+            <h3 className="text-[15px] font-bold text-[#0A0A0A] font-display">Add Expense</h3>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5]">
+            <X className="h-4 w-4 text-[#6B6B6B]" />
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[#1A1A1A]">Category</label>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full h-10 px-3 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white">
+        <form onSubmit={handleSubmit} className="r-modal-body">
+          <div>
+            <label className="r-label">Category</label>
+            <select
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              className="r-select"
+            >
               {Object.entries(CATEGORY_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[#1A1A1A]">Description <span className="text-[#FF4C00]">*</span></label>
-            <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required placeholder="Describe the expense" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+          <div>
+            <label className="r-label">Description <span className="text-[#FF4C00]">*</span></label>
+            <input
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              required
+              placeholder="Describe the expense"
+              className="r-input"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Amount (Rs.) <span className="text-[#FF4C00]">*</span></label>
-              <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
+            <div>
+              <label className="r-label">Amount (Rs.) <span className="text-[#FF4C00]">*</span></label>
+              <input
+                type="number"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                required
+                placeholder="0"
+                className="r-input"
+              />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#1A1A1A]">Date</label>
-              <input type="date" value={form.expense_date} onChange={(e) => setForm({ ...form, expense_date: e.target.value })} className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white" />
+            <div>
+              <label className="r-label">Date</label>
+              <input
+                type="date"
+                value={form.expense_date}
+                onChange={(e) => setForm({ ...form, expense_date: e.target.value })}
+                className="r-input"
+              />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[#1A1A1A]">Notes (optional)</label>
-            <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes" className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]" />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 h-10 rounded-xl border border-[#E5E5E5] text-sm font-semibold text-[#4A4A4A] hover:bg-[#F5F5F5]">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 h-10 bg-[#FF4C00] hover:bg-[#E64400] text-white text-sm font-semibold rounded-xl disabled:opacity-60">{saving ? "Saving..." : "Add Expense"}</button>
+          <div>
+            <label className="r-label">Notes (optional)</label>
+            <input
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Additional notes"
+              className="r-input"
+            />
           </div>
         </form>
+        <div className="r-modal-footer">
+          <button type="button" onClick={onClose} className="r-btn-secondary">Cancel</button>
+          <button onClick={handleSubmit as unknown as React.MouseEventHandler} disabled={saving} className="r-btn-primary disabled:opacity-60">
+            {saving ? "Saving..." : "Add Expense"}
+          </button>
+        </div>
       </div>
     </div>
   );
