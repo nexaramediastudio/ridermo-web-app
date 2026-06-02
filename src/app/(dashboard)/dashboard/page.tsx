@@ -385,7 +385,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Stock Health — like "Engagement Health Score" */}
+            {/* Stock Health — bar chart */}
             <div className="p-6 flex flex-col" style={CARD}>
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-[#F3F4F6] flex items-center justify-center">
@@ -393,10 +393,10 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <span className="text-[15px] font-bold text-[#111827]" style={H}>Stock Health</span>
-                  <p className="text-[11.5px] text-[#9CA3AF] mt-0.5">Track bike availability and inventory levels in real-time.</p>
+                  <p className="text-[11.5px] text-[#9CA3AF] mt-0.5">Available bikes per model.</p>
                 </div>
               </div>
-              <div className="flex items-end gap-3 mt-2 mb-1">
+              <div className="flex items-end gap-3 mb-1">
                 <span className="text-[36px] font-black text-[#111827] tabular-nums leading-none" style={H}>
                   {stockPct}%
                 </span>
@@ -404,24 +404,48 @@ export default function DashboardPage() {
                   {stockPct >= 60 ? "Healthy" : stockPct >= 30 ? "Low Stock" : "Critical"}
                 </span>
               </div>
-              <p className="text-[12px] text-[#9CA3AF] mb-4">{availableBikes} available out of {totalBikes} bikes</p>
-              <div className="space-y-3 flex-1">
-                {data.inventoryByModel.slice(0, 5).map(m => {
-                  const pct = m.total > 0 ? (m.available / m.total) * 100 : 0;
-                  const c = pct > 60 ? "#10B981" : pct > 30 ? "#F59E0B" : "#EF4444";
-                  return (
-                    <div key={m.model} className="flex items-center gap-3">
-                      <span className="text-[11px] text-[#6B7280] font-medium w-28 truncate flex-shrink-0">{m.model}</span>
-                      <div className="flex-1 h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ background: c, width: `${Math.max(pct, 2)}%` }} />
+              <p className="text-[12px] text-[#9CA3AF] mb-3">{availableBikes} available · {totalBikes} total</p>
+
+              {/* Grouped bar chart: available vs sold per model */}
+              {data.inventoryByModel.length > 0 ? (
+                <div className="flex-1 -mx-1">
+                  <ResponsiveContainer width="100%" height={140}>
+                    <BarChart
+                      data={data.inventoryByModel.slice(0, 6).map(m => ({
+                        name: m.model.replace(/TVS\s*/i, "").slice(0, 8),
+                        Available: m.available,
+                        Sold: m.sold,
+                        Reserved: m.reserved,
+                      }))}
+                      margin={{ top: 4, right: 4, left: -28, bottom: 0 }}
+                      barCategoryGap="30%"
+                      barGap={2}
+                    >
+                      <XAxis dataKey="name" tick={{ fontSize: 9.5, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        cursor={{ fill: "#F9FAFB" }}
+                        contentStyle={{ fontSize: 11, borderRadius: 10, border: "1px solid #E5E7EB", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
+                        formatter={(v, n) => [Number(v), String(n)]}
+                      />
+                      <Bar dataKey="Available" fill="#10B981" maxBarSize={12} radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Sold"      fill="#E5E7EB" maxBarSize={12} radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Reserved"  fill="#FCD34D" maxBarSize={12} radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="flex items-center gap-4 mt-1 px-1">
+                    {[{ c: "#10B981", l: "Available" }, { c: "#E5E7EB", l: "Sold" }, { c: "#FCD34D", l: "Reserved" }].map(x => (
+                      <div key={x.l} className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-sm inline-block" style={{ background: x.c }} />
+                        <span className="text-[10px] text-[#9CA3AF]">{x.l}</span>
                       </div>
-                      <span className="text-[11px] font-bold w-5 text-right flex-shrink-0" style={{ color: c }}>{m.available}</span>
-                    </div>
-                  );
-                })}
-                {data.inventoryByModel.length === 0 && <p className="text-[11px] text-[#9CA3AF]">No inventory data yet</p>}
-              </div>
-              <Link href="/inventory/bikes" className="flex items-center gap-1 text-[11px] font-semibold text-[#FF4C00] hover:underline mt-4">
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[11px] text-[#9CA3AF] flex-1">No inventory data yet</p>
+              )}
+
+              <Link href="/inventory/bikes" className="flex items-center gap-1 text-[11px] font-semibold text-[#FF4C00] hover:underline mt-3">
                 Manage inventory <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
