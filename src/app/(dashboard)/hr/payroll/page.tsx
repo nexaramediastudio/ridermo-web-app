@@ -100,16 +100,22 @@ export default function PayrollPage() {
       if (existing) {
         payMap[emp.id] = existing;
       } else {
-        // Calculate defaults
-        const att = attCounts[emp.id] || { present: 0, absent: 0, total: 26, ot: 0 };
-        const workingDays = att.total || 26;
+        // Standard working days = 26 per month (Mon–Sat).
+        // Use att.total only if we have MORE records than 26 (unlikely, but safe).
+        const att = attCounts[emp.id] || { present: 0, absent: 0, total: 0, ot: 0 };
+        const STANDARD_DAYS = 26;
+        const workingDays = STANDARD_DAYS;
         const presentDays = att.present;
-        const dailyRate = emp.basic_salary / workingDays;
-        const earnedBasic = dailyRate * presentDays;
-        const otPay = 0; // Will be calculated with OT hours
-        const gross = earnedBasic + otPay;
-        const epfAmt = emp.type === "worker" ? gross * EPF_RATE : 0;
-        const etfAmt = emp.type === "worker" ? gross * ETF_RATE : 0;
+        const absentDays = Math.max(0, workingDays - presentDays);
+
+        // Earned basic = full basic × (days present / standard working days)
+        const earnedBasic = presentDays > 0
+          ? Math.round((emp.basic_salary / workingDays) * presentDays)
+          : 0;
+
+        const gross = earnedBasic; // commission/bonus/OT added separately
+        const epfAmt = emp.type === "worker" ? Math.round(gross * EPF_RATE) : 0;
+        const etfAmt = emp.type === "worker" ? Math.round(gross * ETF_RATE) : 0;
         const totalDed = epfAmt + etfAmt;
         const net = gross - totalDed;
 
@@ -117,9 +123,9 @@ export default function PayrollPage() {
           employee_id: emp.id,
           month,
           year,
-          basic_salary: emp.basic_salary,
+          basic_salary: earnedBasic,   // store EARNED (prorated) basic, not full
           attendance_bonus: 0,
-          ot_pay: otPay,
+          ot_pay: 0,
           bike_commission: 0,
           bonus: 0,
           gross_salary: gross,
@@ -130,7 +136,7 @@ export default function PayrollPage() {
           net_salary: net,
           working_days: workingDays,
           present_days: presentDays,
-          absent_days: att.absent,
+          absent_days: absentDays,
           status: "draft",
         };
       }
@@ -250,8 +256,8 @@ export default function PayrollPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#F0F0F0]">
-                {["Employee", "Attendance", "Basic", "Commission", "Bonus/OT", "Gross", "EPF/ETF", "Net Salary", "Status", ""].map((h) => (
-                  <th key={h} className="text-left px-4 py-3.5 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider whitespace-nowrap">{h}</th>
+                {["Employee", "Attendance", "Earned Basic", "Commission", "Bonus/OT", "Gross", "EPF/ETF", "Net Salary", "Status", ""].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -299,14 +305,19 @@ export default function PayrollPage() {
                           <span className="text-emerald-600 font-semibold">{entry.present_days}P</span>
                           <span className="text-[#9A9A9A] mx-1">/</span>
                           <span className="text-red-500 font-semibold">{entry.absent_days}A</span>
-                          <p className="text-[#9A9A9A] mt-0.5">{entry.working_days} days</p>
+                          <p className="text-[#9A9A9A] mt-0.5">of {entry.working_days} days</p>
                         </div>
                       </td>
-                      {/* Basic */}
+                      {/* Basic (Earned) */}
                       <td className="px-4 py-3">
-                        <span className="text-sm font-semibold text-[#0A0A0A]">
+                        <span className="text-[13px] font-semibold text-[#0A0A0A]">
                           Rs. {entry.basic_salary.toLocaleString("en", { maximumFractionDigits: 0 })}
                         </span>
+                        {entry.present_days < entry.working_days && (
+                          <p className="text-[10px] text-[#9A9A9A] mt-0.5">
+                            {entry.present_days}/{entry.working_days} days
+                          </p>
+                        )}
                       </td>
                       {/* Commission */}
                       <td className="px-4 py-3">
@@ -409,10 +420,12 @@ export default function PayrollPage() {
         <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
         <div className="text-xs text-amber-700 space-y-1">
           <p className="font-semibold">Payroll Rules Applied:</p>
+          <p>• <strong>Earned Basic</strong> = Full Basic Salary × (Days Present ÷ 26 working days)</p>
           <p>• Workers: EPF 8% + ETF 3% deducted from gross salary</p>
           <p>• Directors: No EPF/ETF deductions</p>
-          <p>• Bike commission is automatically pulled from attendance records (absent workers receive no commission)</p>
+          <p>• Absent workers receive no commission</p>
           <p>• Click <strong>Edit</strong> on any row to manually adjust commission, bonus or OT pay</p>
+          <p>• Click <strong>Recalculate</strong> to recompute from latest attendance records</p>
         </div>
       </div>
     </div>
