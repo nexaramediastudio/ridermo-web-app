@@ -291,6 +291,7 @@ CREATE TABLE IF NOT EXISTS public.cheques (
   payment_date DATE,
   amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
   bank TEXT,
+  sale_id UUID REFERENCES public.sales(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'successful', 'returned')),
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -435,5 +436,7 @@ CREATE INDEX IF NOT EXISTS idx_sales_customer ON public.sales(customer_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_status ON public.inventory_bikes(status);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON public.attendance(date);
 CREATE INDEX IF NOT EXISTS idx_cheques_payment_date ON public.cheques(payment_date);
+CREATE INDEX IF NOT EXISTS idx_cheques_sale_id ON public.cheques(sale_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cheques_tvs_sale_unique ON public.cheques(sale_id) WHERE type = 'tvs' AND sale_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_cr_plates_status ON public.cr_number_plates(cr_status, plate_status);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id, is_read);

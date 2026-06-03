@@ -1,5 +1,5 @@
-import { ChequesView } from "@/components/cheques/cheques-view";
+import { TvsChequesView } from "@/components/cheques/tvs-cheques-view";
 
 export default function TVSChequesPage() {
-  return <ChequesView type="tvs" />;
+  return <TvsChequesView />;
 }
