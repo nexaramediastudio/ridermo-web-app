@@ -18,6 +18,7 @@ interface Employee {
   department?: string;
   type: "director" | "worker";
   basic_salary: number;
+  per_bike_commission: number;
   join_date?: string;
   is_active: boolean;
   created_at: string;
@@ -202,6 +203,14 @@ export default function EmployeesPage() {
                   <Briefcase className="h-3.5 w-3.5 text-[#ABABAB]" />
                   Basic: <span className="font-semibold text-[#0A0A0A]">Rs. {emp.basic_salary.toLocaleString()}</span>
                 </div>
+                {emp.type === "worker" && emp.per_bike_commission > 0 && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                      <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                      Rs. {emp.per_bike_commission.toLocaleString()} / bike
+                    </span>
+                  </div>
+                )}
                 {emp.employee_code && (
                   <div className="flex items-center gap-2 text-xs text-[#6B6B6B]">
                     <span className="text-[#ABABAB]">#</span>
@@ -248,7 +257,8 @@ function AddEmployeeModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   const [form, setForm] = useState({
     employee_code: "", full_name: "", phone: "", nic: "", email: "",
     address: "", type: "worker", designation: "", department: "",
-    basic_salary: "", join_date: new Date().toISOString().split("T")[0],
+    basic_salary: "", per_bike_commission: "",
+    join_date: new Date().toISOString().split("T")[0],
   });
   const [saving, setSaving] = useState(false);
 
@@ -259,6 +269,7 @@ function AddEmployeeModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     const { error } = await supabase.from("employees").insert({
       ...form,
       basic_salary: parseFloat(form.basic_salary) || 0,
+      per_bike_commission: form.type === "worker" ? (parseFloat(form.per_bike_commission) || 0) : 0,
       employee_code: form.employee_code || null,
     });
     if (error) toast.error(error.message);
@@ -332,6 +343,21 @@ function AddEmployeeModal({ onClose, onSuccess }: { onClose: () => void; onSucce
               <label className="r-label">Join Date</label>
               <input type="date" value={form.join_date} onChange={(e) => setForm({ ...form, join_date: e.target.value })} className="r-input" />
             </div>
+            {form.type === "worker" && (
+              <div className="col-span-2">
+                <label className="r-label">
+                  Per Bike Commission (Rs.)
+                  <span className="ml-1.5 text-[10px] font-normal text-[#9A9A9A]">— Worker earns this per bike sold if present that day</span>
+                </label>
+                <input
+                  type="number"
+                  value={form.per_bike_commission}
+                  onChange={(e) => setForm({ ...form, per_bike_commission: e.target.value })}
+                  placeholder="e.g. 500"
+                  className="r-input"
+                />
+              </div>
+            )}
             <div className="col-span-2">
               <label className="r-label">Address</label>
               <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" className="r-input" />

@@ -63,19 +63,21 @@ export default function PayrollPage() {
     setLoading(true);
     const supabase = createClient();
 
-    const [empRes, payRes, attRes] = await Promise.all([
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    const monthEnd   = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+
+    const [empRes, payRes, attRes, commRes] = await Promise.all([
       supabase.from("employees").select("id, full_name, type, employee_code, basic_salary, is_active").eq("is_active", true).order("full_name"),
       supabase.from("payroll").select("*").eq("month", month).eq("year", year),
-      // Get attendance summary for this month
-      supabase.from("attendance")
-        .select("employee_id, status")
-        .gte("date", `${year}-${String(month).padStart(2, "0")}-01`)
-        .lt("date", month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, "0")}-01`),
+      supabase.from("attendance").select("employee_id, status").gte("date", monthStart).lt("date", monthEnd),
+      // Sum worker commissions earned this month (attendance-checked at sale time)
+      supabase.from("worker_commissions").select("employee_id, amount").gte("sale_date", monthStart).lt("sale_date", monthEnd),
     ]);
 
     const emps = empRes.data || [];
     const existingPayroll = payRes.data || [];
     const attRecords = attRes.data || [];
+    const commRecords = commRes.data || [];
 
     // Build attendance counts per employee
     const attCounts: Record<string, { present: number; absent: number; total: number; ot: number }> = {};
@@ -91,6 +93,12 @@ export default function PayrollPage() {
       }
     });
 
+    // Sum commissions per employee
+    const commTotals: Record<string, number> = {};
+    commRecords.forEach((c) => {
+      commTotals[c.employee_id] = (commTotals[c.employee_id] || 0) + Number(c.amount);
+    });
+
     setEmployees(emps);
 
     // Build payroll map
@@ -100,8 +108,6 @@ export default function PayrollPage() {
       if (existing) {
         payMap[emp.id] = existing;
       } else {
-        // Standard working days = 26 per month (Mon–Sat).
-        // Use att.total only if we have MORE records than 26 (unlikely, but safe).
         const att = attCounts[emp.id] || { present: 0, absent: 0, total: 0, ot: 0 };
         const STANDARD_DAYS = 26;
         const workingDays = STANDARD_DAYS;
@@ -113,7 +119,10 @@ export default function PayrollPage() {
           ? Math.round((emp.basic_salary / workingDays) * presentDays)
           : 0;
 
-        const gross = earnedBasic; // commission/bonus/OT added separately
+        // Auto-loaded bike commission (only workers; directors get 0)
+        const bikeCommission = emp.type === "worker" ? Math.round(commTotals[emp.id] || 0) : 0;
+
+        const gross = earnedBasic + bikeCommission;
         const epfAmt = emp.type === "worker" ? Math.round(gross * EPF_RATE) : 0;
         const etfAmt = emp.type === "worker" ? Math.round(gross * ETF_RATE) : 0;
         const totalDed = epfAmt + etfAmt;
@@ -123,10 +132,10 @@ export default function PayrollPage() {
           employee_id: emp.id,
           month,
           year,
-          basic_salary: earnedBasic,   // store EARNED (prorated) basic, not full
+          basic_salary: earnedBasic,
           attendance_bonus: 0,
           ot_pay: 0,
-          bike_commission: 0,
+          bike_commission: bikeCommission,
           bonus: 0,
           gross_salary: gross,
           epf_employee: epfAmt,
@@ -329,10 +338,17 @@ export default function PayrollPage() {
                             placeholder="0"
                             className="w-24 h-8 px-2 rounded-xl border border-[#E5E5E5] text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]"
                           />
+                        ) : entry.bike_commission > 0 ? (
+                          <div>
+                            <span className="text-sm font-semibold text-amber-700">
+                              Rs. {entry.bike_commission.toLocaleString("en", { maximumFractionDigits: 0 })}
+                            </span>
+                            {emp.type === "worker" && (
+                              <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide mt-0.5">auto</p>
+                            )}
+                          </div>
                         ) : (
-                          <span className="text-sm text-[#4A4A4A]">
-                            {entry.bike_commission > 0 ? `Rs. ${entry.bike_commission.toLocaleString("en", { maximumFractionDigits: 0 })}` : "—"}
-                          </span>
+                          <span className="text-sm text-[#ABABAB]">—</span>
                         )}
                       </td>
                       {/* Bonus/OT */}

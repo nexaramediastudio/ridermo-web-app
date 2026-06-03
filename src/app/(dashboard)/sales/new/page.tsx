@@ -193,6 +193,40 @@ export default function NewSalePage() {
       if (saleErr) throw saleErr;
       await supabase.from("inventory_bikes").update({ status: "sold" }).eq("id", selectedBike!.id);
       await supabase.from("cr_number_plates").insert({ sale_id: sale.id, bike_id: selectedBike!.id, customer_id: customerId, cr_status: "pending", plate_status: "pending" });
+
+      // ── Auto-distribute worker commissions ───────────────────────
+      const saleDate = new Date().toISOString().split("T")[0];
+      const { data: workers } = await supabase
+        .from("employees")
+        .select("id, per_bike_commission")
+        .eq("type", "worker")
+        .eq("is_active", true)
+        .gt("per_bike_commission", 0);
+
+      if (workers && workers.length > 0) {
+        const workerIds = workers.map((w) => w.id);
+        const { data: attendance } = await supabase
+          .from("attendance")
+          .select("employee_id, status")
+          .eq("date", saleDate)
+          .in("employee_id", workerIds)
+          .in("status", ["present", "half_day"]);
+
+        const presentIds = new Set((attendance || []).map((a) => a.employee_id));
+        const commissions = workers
+          .filter((w) => presentIds.has(w.id))
+          .map((w) => ({
+            sale_id: sale.id,
+            employee_id: w.id,
+            sale_date: saleDate,
+            amount: w.per_bike_commission,
+          }));
+
+        if (commissions.length > 0) {
+          await supabase.from("worker_commissions").insert(commissions);
+        }
+      }
+
       toast.success(`Sale completed! Invoice: ${invoiceNumber}`);
       router.push(`/sales`);
     } catch (err: unknown) {
