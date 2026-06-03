@@ -124,7 +124,7 @@ export interface Cheque {
 
 export interface Expense {
   id: string;
-  category: "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "other";
+  category: "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "ridermo_payment" | "other";
   description: string;
   amount: number;
   expense_date: string;

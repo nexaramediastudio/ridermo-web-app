@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Plus, Search, Wallet, X, ChevronLeft, ChevronRight, Receipt, TrendingDown, Trash2 } from "lucide-react";
 
-type ExpenseCategory = "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "other";
+type ExpenseCategory = "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "ridermo_payment" | "other";
 
 interface Expense {
   id: string;
@@ -24,6 +24,7 @@ const CATEGORY_CONFIG: Record<ExpenseCategory, { label: string; badge: string }>
   broker_commission: { label: "Broker Commission", badge: "r-badge-orange" },
   bonus:             { label: "Bonus",             badge: "r-badge-amber" },
   petty_cash:        { label: "Petty Cash",        badge: "r-badge-gray" },
+  ridermo_payment:   { label: "Ridermo Payment",   badge: "r-badge-orange" },
   other:             { label: "Other",             badge: "r-badge-gray" },
 };
 

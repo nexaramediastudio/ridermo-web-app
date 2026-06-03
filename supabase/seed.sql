@@ -150,7 +150,7 @@ ON CONFLICT DO NOTHING;
 -- ============================================================
 -- EXPENSE CATEGORIES (reference data - already in CHECK constraint)
 -- Just confirming the categories available:
--- rent, utilities, salary, broker_commission, bonus, petty_cash, other
+-- rent, utilities, salary, broker_commission, bonus, petty_cash, ridermo_payment, other
 -- ============================================================
 
 -- ============================================================

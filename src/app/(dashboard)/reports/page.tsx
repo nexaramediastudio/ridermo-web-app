@@ -52,6 +52,7 @@ const EXP_CATS: Record<string, string> = {
   rent:"bg-purple-50 text-purple-700", utilities:"bg-blue-50 text-blue-700",
   salary:"bg-emerald-50 text-emerald-700", broker_commission:"bg-orange-50 text-orange-700",
   bonus:"bg-amber-50 text-amber-700", petty_cash:"bg-slate-100 text-slate-700",
+  ridermo_payment:"bg-[#FF4C00]/10 text-[#FF4C00]",
   other:"bg-gray-100 text-gray-700",
 };
 const PAY_STYLES: Record<string, string> = {

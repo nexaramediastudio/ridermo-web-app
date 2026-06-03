@@ -306,7 +306,7 @@ CREATE POLICY "Authenticated users can access cheques" ON public.cheques FOR ALL
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.expenses (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  category TEXT NOT NULL CHECK (category IN ('rent', 'utilities', 'salary', 'broker_commission', 'bonus', 'petty_cash', 'other')),
+  category TEXT NOT NULL CHECK (category IN ('rent', 'utilities', 'salary', 'broker_commission', 'bonus', 'petty_cash', 'ridermo_payment', 'other')),
   description TEXT NOT NULL,
   amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
   expense_date DATE DEFAULT CURRENT_DATE,
