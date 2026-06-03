@@ -13,6 +13,11 @@ import {
   Wallet, ShoppingCart, Building2, Shield, CreditCard,
   Printer, FileSpreadsheet, Calendar, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
+import {
+  sumReceivedByCategory,
+  type CommissionCategory,
+} from "@/lib/finance/commission-records";
+import { calcPotentialIncome } from "@/lib/finance/commission-records";
 
 // ─── Types ───────────────────────────────────────────────────────
 type ReportTab = "pl" | "sales" | "commission" | "expenses" | "inventory";
@@ -24,8 +29,11 @@ interface MonthlyRow {
 }
 interface SaleRow {
   id: string; invoice_number: string; customer: string; bike: string;
-  payment_type: string; total_amount: number; tvs_commission: number;
-  finance_commission: number; insurance_commission: number; sale_date: string;
+  payment_type: string; total_amount: number;
+  received_income: number; pending_income: number;
+  tvs_commission: number; finance_commission: number; insurance_commission: number;
+  transport_charges: number; documentation_charges: number; other_earnings: number;
+  sale_date: string;
 }
 interface ExpenseRow {
   id: string; category: string; description: string; amount: number; expense_date: string;
@@ -101,6 +109,7 @@ export default function ReportsPage() {
   const [salesRows, setSalesRows] = useState<SaleRow[]>([]);
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [inventoryRows, setInventoryRows] = useState<InventoryRow[]>([]);
+  const [periodReceivedTotal, setPeriodReceivedTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const printRef = useRef<HTMLDivElement>(null);
@@ -118,23 +127,53 @@ export default function ReportsPage() {
         ? `${year + 1}-01-01`
         : `${year}-${String(selectedMonth + 2).padStart(2, "0")}-01`;
 
-    const [salesR, expR, invR] = await Promise.all([
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year + 1}-01-01`;
+
+    const [salesR, expR, invR, yearCommR, periodCommR] = await Promise.all([
       supabase.from("sales")
-        .select("id, invoice_number, sale_date, total_amount, payment_type, tvs_commission, finance_commission, insurance_commission, customers(full_name), inventory_bikes(bike_models(name))")
-        .eq("status", "completed").gte("sale_date", viewMode === "yearly" ? `${year}-01-01` : start).lt("sale_date", viewMode === "yearly" ? `${year+1}-01-01` : end)
+        .select("id, invoice_number, sale_date, total_amount, payment_type, tvs_commission, finance_commission, insurance_commission, transport_charges, documentation_charges, other_earnings, customers(full_name), inventory_bikes(bike_models(name))")
+        .eq("status", "completed").gte("sale_date", viewMode === "yearly" ? yearStart : start).lt("sale_date", viewMode === "yearly" ? yearEnd : end)
         .order("sale_date", { ascending: false }),
       supabase.from("expenses")
         .select("id, category, description, amount, expense_date")
-        .gte("expense_date", viewMode === "yearly" ? `${year}-01-01` : start).lt("expense_date", viewMode === "yearly" ? `${year+1}-01-01` : end)
+        .gte("expense_date", viewMode === "yearly" ? yearStart : start).lt("expense_date", viewMode === "yearly" ? yearEnd : end)
         .order("expense_date", { ascending: false }),
       supabase.from("inventory_bikes").select("status, purchase_price, bike_models(name)"),
+      supabase.from("commission_records")
+        .select("sale_id, category, amount, status, received_at")
+        .gte("received_at", yearStart).lt("received_at", yearEnd)
+        .eq("status", "received"),
+      supabase.from("commission_records")
+        .select("amount")
+        .eq("status", "received")
+        .gte("received_at", viewMode === "yearly" ? yearStart : start)
+        .lt("received_at", viewMode === "yearly" ? yearEnd : end),
     ]);
 
-    // Sales rows
+    const saleIds = (salesR.data || []).map((s: { id: string }) => s.id);
+    let commBySale: Record<string, { received: number; pending: number; records: { category: CommissionCategory; amount: number; status: string }[] }> = {};
+    if (saleIds.length) {
+      const { data: saleComms } = await supabase
+        .from("commission_records")
+        .select("sale_id, category, amount, status")
+        .in("sale_id", saleIds);
+      for (const c of saleComms || []) {
+        if (!commBySale[c.sale_id]) commBySale[c.sale_id] = { received: 0, pending: 0, records: [] };
+        if (c.status === "received") commBySale[c.sale_id].received += Number(c.amount || 0);
+        else commBySale[c.sale_id].pending += Number(c.amount || 0);
+        commBySale[c.sale_id].records.push(c as { category: CommissionCategory; amount: number; status: string });
+      }
+    }
+
     const sRows: SaleRow[] = (salesR.data || []).map((s: Record<string, unknown>) => {
       const c = Array.isArray(s.customers) ? s.customers[0] : s.customers;
       const ib = Array.isArray(s.inventory_bikes) ? s.inventory_bikes[0] : s.inventory_bikes;
       const bm = ib ? (Array.isArray((ib as Record<string, unknown>).bike_models) ? (ib as Record<string, unknown[]>).bike_models[0] : (ib as Record<string, unknown>).bike_models) : null;
+      const comm = commBySale[s.id as string] || { received: 0, pending: 0, records: [] };
+      const tvs = comm.records.filter(r => r.category === "tvs" && r.status === "received").reduce((sum, r) => sum + r.amount, 0);
+      const fin = comm.records.filter(r => r.category === "finance" && r.status === "received").reduce((sum, r) => sum + r.amount, 0);
+      const ins = comm.records.filter(r => r.category === "insurance" && r.status === "received").reduce((sum, r) => sum + r.amount, 0);
       return {
         id: s.id as string,
         invoice_number: s.invoice_number as string,
@@ -142,13 +181,19 @@ export default function ReportsPage() {
         bike: (bm as Record<string, string> | null)?.name || "—",
         payment_type: s.payment_type as string,
         total_amount: s.total_amount as number,
-        tvs_commission: (s.tvs_commission as number) || 0,
-        finance_commission: (s.finance_commission as number) || 0,
-        insurance_commission: (s.insurance_commission as number) || 0,
+        received_income: comm.received,
+        pending_income: comm.pending,
+        tvs_commission: tvs,
+        finance_commission: fin,
+        insurance_commission: ins,
+        transport_charges: 0,
+        documentation_charges: 0,
+        other_earnings: 0,
         sale_date: s.sale_date as string,
       };
     });
     setSalesRows(sRows);
+    setPeriodReceivedTotal((periodCommR.data || []).reduce((s, c) => s + Number(c.amount || 0), 0));
 
     // Expense rows
     setExpenseRows((expR.data || []) as ExpenseRow[]);
@@ -156,20 +201,25 @@ export default function ReportsPage() {
     // Monthly breakdown (for yearly mode)
     const allSales = salesR.data || [];
     const allExp = expR.data || [];
+    const yearReceived = yearCommR.data || [];
     const monthRows: MonthlyRow[] = MONTHS.map((m, i) => {
       const mStr = `${year}-${String(i + 1).padStart(2, "0")}`;
-      const ms = allSales.filter((s: Record<string, unknown>) => (s.sale_date as string)?.startsWith(mStr));
+      const mStart = mStr + "-01";
+      const mEnd = i === 11 ? `${year + 1}-01-01` : `${year}-${String(i + 2).padStart(2, "0")}-01`;
+      const mr = yearReceived.filter((c) => (c.received_at as string) >= mStart && (c.received_at as string) < mEnd);
       const me = allExp.filter((e: Record<string, unknown>) => (e.expense_date as string)?.startsWith(mStr));
-      const revenue = ms.reduce((s: number, r: Record<string, unknown>) => s + (r.total_amount as number), 0);
+      const revenue = mr.reduce((s, c) => s + Number(c.amount || 0), 0);
+      const byCat = sumReceivedByCategory(mr as { amount: number; status: "received"; category: CommissionCategory }[]);
       const expenses = me.reduce((s: number, r: Record<string, unknown>) => s + (r.amount as number), 0);
       const profit = revenue - expenses;
+      const ms = allSales.filter((s: Record<string, unknown>) => (s.sale_date as string)?.startsWith(mStr));
       return {
         month: m, monthNum: i + 1, revenue, expenses, profit,
         sales_count: ms.length,
         margin: revenue > 0 ? (profit / revenue) * 100 : 0,
-        tvs_comm: ms.reduce((s: number, r: Record<string, unknown>) => s + ((r.tvs_commission as number) || 0), 0),
-        finance_comm: ms.reduce((s: number, r: Record<string, unknown>) => s + ((r.finance_commission as number) || 0), 0),
-        insurance_comm: ms.reduce((s: number, r: Record<string, unknown>) => s + ((r.insurance_commission as number) || 0), 0),
+        tvs_comm: byCat.tvs,
+        finance_comm: byCat.finance,
+        insurance_comm: byCat.insurance,
       };
     });
     setMonthly(monthRows);
@@ -194,7 +244,8 @@ export default function ReportsPage() {
   useEffect(() => { loadData(); }, [loadData]);
 
   // ── Aggregates ────────────────────────────────────────────────
-  const totalRev = viewMode === "yearly" ? monthly.reduce((s, m) => s + m.revenue, 0) : salesRows.reduce((s, r) => s + r.total_amount, 0);
+  const totalRev = viewMode === "yearly" ? monthly.reduce((s, m) => s + m.revenue, 0) : periodReceivedTotal;
+  const totalVehicleValue = salesRows.reduce((s, r) => s + r.total_amount, 0);
   const totalExp = viewMode === "yearly" ? monthly.reduce((s, m) => s + m.expenses, 0) : expenseRows.reduce((s, r) => s + r.amount, 0);
   const totalProfit = totalRev - totalExp;
   const totalSales = viewMode === "yearly" ? monthly.reduce((s, m) => s + m.sales_count, 0) : salesRows.length;
@@ -202,6 +253,7 @@ export default function ReportsPage() {
   const totalFin = salesRows.reduce((s, r) => s + r.finance_commission, 0);
   const totalIns = salesRows.reduce((s, r) => s + r.insurance_commission, 0);
   const totalComm = totalTvs + totalFin + totalIns;
+  const totalCharges = salesRows.reduce((s, r) => s + r.transport_charges + r.documentation_charges + r.other_earnings, 0);
   const margin = totalRev > 0 ? (totalProfit / totalRev) * 100 : 0;
 
   // Expense by category
@@ -269,9 +321,9 @@ export default function ReportsPage() {
           </button>
           <button
             onClick={() => {
-              if (tab === "sales") exportCSV(salesRows.map(r => ({ Invoice: r.invoice_number, Date: r.sale_date, Customer: r.customer, Bike: r.bike, Payment: r.payment_type, Amount: r.total_amount, "TVS Comm": r.tvs_commission, "Finance Comm": r.finance_commission, "Insurance Comm": r.insurance_commission })), `sales-${periodLabel}.csv`);
+              if (tab === "sales") exportCSV(salesRows.map(r => ({ Invoice: r.invoice_number, Date: r.sale_date, Customer: r.customer, Bike: r.bike, Payment: r.payment_type, "Vehicle Value": r.total_amount, "Received Income": r.received_income, Pending: r.pending_income, "TVS Comm": r.tvs_commission, "Finance Comm": r.finance_commission, "Insurance Comm": r.insurance_commission })), `sales-${periodLabel}.csv`);
               else if (tab === "expenses") exportCSV(expenseRows.map(r => ({ Date: r.expense_date, Category: r.category, Description: r.description, Amount: r.amount })), `expenses-${periodLabel}.csv`);
-              else if (tab === "pl") exportCSV(monthly.map(m => ({ Month: m.month, Sales: m.sales_count, Revenue: m.revenue, Expenses: m.expenses, Profit: m.profit, "Margin%": m.margin.toFixed(1) })), `pl-${year}.csv`);
+              else if (tab === "pl") exportCSV(monthly.map(m => ({ Month: m.month, Sales: m.sales_count, "Received Income": m.revenue, Expenses: m.expenses, Profit: m.profit, "Margin%": m.margin.toFixed(1) })), `pl-${year}.csv`);
               else if (tab === "inventory") exportCSV(inventoryRows.map(r => ({ Model: r.model, Available: r.available, Sold: r.sold, Reserved: r.reserved, Total: r.total, "Stock Value": r.stockValue })), `inventory-${periodLabel}.csv`);
             }}
             className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-[#FF4C00] text-white text-xs font-semibold hover:bg-[#E04400] transition-colors shadow-[0_4px_12px_rgba(255,76,0,0.25)]">
@@ -283,11 +335,11 @@ export default function ReportsPage() {
       {/* ── KPI Row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: "Revenue", value: fmt(totalRev), sub: `${totalSales} sales`, icon: TrendingUp, accent: true, up: totalRev > 0 },
+          { label: "Received Income", value: fmt(totalRev), sub: `${totalSales} sales · recognized revenue`, icon: TrendingUp, accent: true, up: totalRev > 0 },
           { label: "Expenses", value: fmt(totalExp), sub: "Total outflows", icon: Wallet, accent: false, up: false },
           { label: "Net Profit", value: fmt(Math.abs(totalProfit)), sub: totalProfit >= 0 ? "Profitable" : "Net Loss", icon: totalProfit >= 0 ? ArrowUpRight : ArrowDownRight, accent: false, up: totalProfit >= 0 },
           { label: "Margin", value: `${margin.toFixed(1)}%`, sub: "Profit margin", icon: BarChart2, accent: false, up: margin > 20 },
-          { label: "Commission", value: fmt(totalComm), sub: "TVS + Finance + Ins.", icon: Receipt, accent: false, up: totalComm > 0 },
+          { label: "Commissions", value: fmt(totalComm), sub: totalCharges > 0 ? `+ ${fmt(totalCharges)} charges` : "TVS + Finance + Ins.", icon: Receipt, accent: false, up: totalComm > 0 },
         ].map(({ label, value, sub, icon: Icon, accent, up }) => (
           <div key={label} className={`bg-white rounded-xl px-4 py-3 border flex items-center justify-between gap-3 hover:border-[#D0D0D0] transition-colors ${accent ? "border-[#FF4C00]/20" : "border-[#E8E8E8]"}`}>
             <div>
@@ -329,11 +381,11 @@ export default function ReportsPage() {
           <div className="bg-white border border-[#E8E8E8] rounded-2xl p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Revenue vs Expenses — {year}</h3>
+                <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Dealership Income vs Expenses — {year}</h3>
                 <p className="text-[11px] text-[#ABABAB] mt-0.5">Monthly comparison across all 12 months</p>
               </div>
               <div className="flex items-center gap-4 text-[11px] text-[#ABABAB]">
-                {[{ c: "#FF4C00", l: "Revenue" }, { c: "#D0D0D0", l: "Expenses" }].map(x => (
+                {[{ c: "#FF4C00", l: "Income" }, { c: "#D0D0D0", l: "Expenses" }].map(x => (
                   <div key={x.l} className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded" style={{ background: x.c }} /><span>{x.l}</span></div>
                 ))}
               </div>
@@ -351,7 +403,7 @@ export default function ReportsPage() {
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#ABABAB" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false} tickFormatter={fmtK} />
                   <Tooltip content={<CT />} />
-                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#FF4C00" strokeWidth={2.5} fill="url(#gRev)" dot={false} />
+                  <Area type="monotone" dataKey="revenue" name="Income" stroke="#FF4C00" strokeWidth={2.5} fill="url(#gRev)" dot={false} />
                   <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#D0D0D0" strokeWidth={1.5} fill="none" strokeDasharray="4 2" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -382,14 +434,14 @@ export default function ReportsPage() {
             <div className="px-6 py-4 border-b border-[#F5F5F5] flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Monthly P&L Breakdown — {year}</h3>
               <div className="flex items-center gap-4 text-xs text-[#9A9A9A]">
-                <span>Total Revenue: <strong className="text-[#0A0A0A]">{fmt(totalRev)}</strong></span>
+                <span>Total Income: <strong className="text-[#0A0A0A]">{fmt(totalRev)}</strong></span>
                 <span>Total Profit: <strong className={totalProfit >= 0 ? "text-emerald-600" : "text-red-500"}>{fmt(totalProfit)}</strong></span>
               </div>
             </div>
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#F5F5F5]">
-                  {["Month", "Sales", "Revenue", "Expenses", "Profit / Loss", "Margin", "TVS Comm", "Finance Comm", "Insurance Comm"].map(h => (
+                  {["Month", "Sales", "Received Income", "Expenses", "Profit / Loss", "Margin", "TVS Comm", "Finance Comm", "Insurance Comm"].map(h => (
                     <th key={h} className="text-left px-5 py-3 text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -454,9 +506,9 @@ export default function ReportsPage() {
           {/* Payment split */}
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: "Cash Sales", count: salesRows.filter(s=>s.payment_type==="cash").length, total: salesRows.filter(s=>s.payment_type==="cash").reduce((s,r)=>s+r.total_amount,0), color: "bg-emerald-50", text: "text-emerald-700" },
-              { label: "Finance Sales", count: salesRows.filter(s=>s.payment_type==="finance").length, total: salesRows.filter(s=>s.payment_type==="finance").reduce((s,r)=>s+r.total_amount,0), color: "bg-blue-50", text: "text-blue-700" },
-              { label: "Insurance Sales", count: salesRows.filter(s=>s.payment_type==="insurance").length, total: salesRows.filter(s=>s.payment_type==="insurance").reduce((s,r)=>s+r.total_amount,0), color: "bg-purple-50", text: "text-purple-700" },
+              { label: "Cash Sales", count: salesRows.filter(s=>s.payment_type==="cash").length, total: salesRows.filter(s=>s.payment_type==="cash").reduce((s,r)=>s+r.received_income,0), color: "bg-emerald-50", text: "text-emerald-700" },
+              { label: "Finance Sales", count: salesRows.filter(s=>s.payment_type==="finance").length, total: salesRows.filter(s=>s.payment_type==="finance").reduce((s,r)=>s+r.received_income,0), color: "bg-blue-50", text: "text-blue-700" },
+              { label: "Insurance Sales", count: salesRows.filter(s=>s.payment_type==="insurance").length, total: salesRows.filter(s=>s.payment_type==="insurance").reduce((s,r)=>s+r.received_income,0), color: "bg-purple-50", text: "text-purple-700" },
             ].map(({ label, count, total, color, text }) => (
               <div key={label} className={`${color} rounded-xl px-4 py-3 flex items-center justify-between gap-3`}>
                 <div>
@@ -472,7 +524,7 @@ export default function ReportsPage() {
           <div className="bg-white rounded-2xl border border-[#E8E8E8] overflow-hidden">
             <div className="px-6 py-4 border-b border-[#F5F5F5] flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Sales — {periodLabel}</h3>
-              <span className="text-xs text-[#9A9A9A] font-medium">{salesRows.length} records · {fmt(totalRev)} total</span>
+              <span className="text-xs text-[#9A9A9A] font-medium">{salesRows.length} records · {fmt(totalRev)} received · {fmt(salesRows.reduce((s,r)=>s+r.pending_income,0))} pending</span>
             </div>
             {loading ? <div className="p-6"><div className="h-48 bg-[#F5F5F5] rounded-xl animate-pulse" /></div> :
             salesRows.length === 0 ? (
@@ -485,7 +537,7 @@ export default function ReportsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-[#F5F5F5]">
-                      {["Date", "Invoice", "Customer", "Bike", "Payment", "Amount", "TVS Comm", "Finance Comm", "Ins. Comm"].map(h => (
+                      {["Date", "Invoice", "Customer", "Bike", "Payment", "Vehicle Value", "Received", "Pending", "TVS Comm", "Finance Comm", "Ins. Comm"].map(h => (
                         <th key={h} className="text-left px-5 py-3 text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -498,7 +550,9 @@ export default function ReportsPage() {
                         <td className="px-5 py-3"><span className="text-sm font-semibold text-[#0A0A0A]">{s.customer}</span></td>
                         <td className="px-5 py-3"><span className="text-sm text-[#4A4A4A]">{s.bike}</span></td>
                         <td className="px-5 py-3"><span className={`text-[10px] font-bold px-2 py-1 rounded-full ${PAY_STYLES[s.payment_type] || "bg-[#F5F5F5] text-[#6B6B6B]"}`}>{s.payment_type}</span></td>
-                        <td className="px-5 py-3"><span className="text-sm font-bold text-[#0A0A0A]">{fmt(s.total_amount)}</span></td>
+                        <td className="px-5 py-3"><span className="text-sm text-[#6B6B6B]">{fmt(s.total_amount)}</span></td>
+                        <td className="px-5 py-3"><span className="text-sm font-bold text-emerald-600">{s.received_income > 0 ? fmt(s.received_income) : "—"}</span></td>
+                        <td className="px-5 py-3"><span className="text-sm font-semibold text-amber-600">{s.pending_income > 0 ? fmt(s.pending_income) : "—"}</span></td>
                         <td className="px-5 py-3"><span className="text-xs text-[#6B6B6B]">{s.tvs_commission > 0 ? fmt(s.tvs_commission) : "—"}</span></td>
                         <td className="px-5 py-3"><span className="text-xs text-[#6B6B6B]">{s.finance_commission > 0 ? fmt(s.finance_commission) : "—"}</span></td>
                         <td className="px-5 py-3"><span className="text-xs text-[#6B6B6B]">{s.insurance_commission > 0 ? fmt(s.insurance_commission) : "—"}</span></td>
@@ -506,7 +560,9 @@ export default function ReportsPage() {
                     ))}
                     <tr className="bg-[#FAFAFA] border-t-2 border-[#EFEFEF]">
                       <td colSpan={5} className="px-5 py-3"><span className="text-sm font-bold text-[#0A0A0A]">Total ({salesRows.length} sales)</span></td>
-                      <td className="px-5 py-3"><span className="text-sm font-bold text-[#FF4C00]">{fmt(totalRev)}</span></td>
+                      <td className="px-5 py-3"><span className="text-sm font-semibold text-[#6B6B6B]">{fmt(totalVehicleValue)}</span></td>
+                      <td className="px-5 py-3"><span className="text-sm font-bold text-emerald-600">{fmt(totalRev)}</span></td>
+                      <td className="px-5 py-3"><span className="text-sm font-bold text-amber-600">{fmt(salesRows.reduce((s,r)=>s+r.pending_income,0))}</span></td>
                       <td className="px-5 py-3"><span className="text-xs font-bold text-[#0A0A0A]">{fmt(totalTvs)}</span></td>
                       <td className="px-5 py-3"><span className="text-xs font-bold text-[#0A0A0A]">{fmt(totalFin)}</span></td>
                       <td className="px-5 py-3"><span className="text-xs font-bold text-[#0A0A0A]">{fmt(totalIns)}</span></td>

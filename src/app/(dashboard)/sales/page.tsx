@@ -7,23 +7,27 @@ import Link from "next/link";
 import {
   Plus, Search, FileText, TrendingUp, Bike, User,
   CreditCard, ArrowRight, Building2, Shield, Zap,
-  ArrowUpRight, ArrowDownRight, ShoppingCart,
+  ArrowUpRight, ArrowDownRight, ShoppingCart, Clock,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar,
 } from "recharts";
-
 interface SaleRow {
   id: string;
   invoice_number: string;
   sale_date: string;
   total_amount: number;
+  received_income: number;
+  pending_income: number;
   payment_type: "cash" | "finance" | "insurance";
   status: string;
   tvs_commission: number;
   finance_commission: number;
   insurance_commission: number;
+  transport_charges: number;
+  documentation_charges: number;
+  other_earnings: number;
   inventory_bikes: { round_number: string; bike_models: { name: string } | null } | null;
   customers: { full_name: string; phone?: string } | null;
 }
@@ -73,6 +77,7 @@ export default function SalesHistoryPage() {
       .from("sales")
       .select(`id, invoice_number, sale_date, total_amount, payment_type, status,
         tvs_commission, finance_commission, insurance_commission,
+        transport_charges, documentation_charges, other_earnings,
         inventory_bikes(round_number, bike_models(name)),
         customers(full_name, phone)`)
       .order("created_at", { ascending: false });
@@ -88,16 +93,50 @@ export default function SalesHistoryPage() {
 
     const { data, error } = await query.limit(500);
     if (error) { toast.error("Failed to load sales"); setLoading(false); return; }
-    const rows = (data as unknown as SaleRow[]) || [];
+    const rawRows = (data as unknown as Omit<SaleRow, "received_income" | "pending_income">[]) || [];
+    const saleIds = rawRows.map((s) => s.id);
+    let commMap: Record<string, { received: number; pending: number }> = {};
+    if (saleIds.length) {
+      const { data: comms } = await supabase
+        .from("commission_records")
+        .select("sale_id, amount, status")
+        .in("sale_id", saleIds);
+      for (const c of comms || []) {
+        if (!commMap[c.sale_id]) commMap[c.sale_id] = { received: 0, pending: 0 };
+        if (c.status === "received") commMap[c.sale_id].received += Number(c.amount || 0);
+        else commMap[c.sale_id].pending += Number(c.amount || 0);
+      }
+    }
+    const rows: SaleRow[] = rawRows.map((s) => ({
+      ...s,
+      transport_charges: s.transport_charges || 0,
+      documentation_charges: s.documentation_charges || 0,
+      other_earnings: s.other_earnings || 0,
+      received_income: commMap[s.id]?.received || 0,
+      pending_income: commMap[s.id]?.pending || 0,
+    }));
     setSales(rows);
 
-    // Build chart data
+    // Chart: received income by received date (load received commissions in period)
+    const periodStart = dateFilter === "today" ? now.toISOString().split("T")[0]
+      : dateFilter === "month" ? new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
+      : dateFilter === "year" ? `${now.getFullYear()}-01-01` : "2000-01-01";
+    const { data: periodComms } = await supabase
+      .from("commission_records")
+      .select("amount, received_at")
+      .eq("status", "received")
+      .gte("received_at", periodStart);
     const byDate: Record<string, { revenue: number; count: number }> = {};
+    for (const c of periodComms || []) {
+      const d = (c.received_at as string)?.split("T")[0] || "";
+      if (!byDate[d]) byDate[d] = { revenue: 0, count: 0 };
+      byDate[d].revenue += Number(c.amount || 0);
+      byDate[d].count++;
+    }
     for (const s of rows) {
       const d = s.sale_date?.split("T")[0] || "";
       if (!byDate[d]) byDate[d] = { revenue: 0, count: 0 };
-      byDate[d].revenue += s.total_amount;
-      byDate[d].count++;
+      byDate[d].count += 1;
     }
     const sorted = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b));
     setChartData(sorted.map(([date, v]) => ({
@@ -119,7 +158,9 @@ export default function SalesHistoryPage() {
       s.inventory_bikes?.bike_models?.name?.toLowerCase().includes(q);
   });
 
-  const totalRevenue = filtered.reduce((s, r) => s + r.total_amount, 0);
+  const totalReceived = filtered.reduce((s, r) => s + r.received_income, 0);
+  const totalPending = filtered.reduce((s, r) => s + r.pending_income, 0);
+  const totalVehicleValue = filtered.reduce((s, r) => s + r.total_amount, 0);
   const totalTVS = filtered.reduce((s, r) => s + (r.tvs_commission || 0), 0);
   const totalFinance = filtered.reduce((s, r) => s + (r.finance_commission || 0), 0);
   const totalIns = filtered.reduce((s, r) => s + (r.insurance_commission || 0), 0);
@@ -135,7 +176,7 @@ export default function SalesHistoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Sales History</h2>
-          <p className="text-[12px] text-[#ABABAB] mt-0.5">{filtered.length} transaction{filtered.length !== 1 ? "s" : ""} · Rs. {totalRevenue.toLocaleString()} total</p>
+          <p className="text-[12px] text-[#ABABAB] mt-0.5">{filtered.length} sales · Rs. {totalReceived.toLocaleString()} received · Rs. {totalPending.toLocaleString()} pending</p>
         </div>
         <Link href="/sales/new" className="flex items-center gap-2 h-9 px-4 bg-[#FF4C00] text-white text-[13px] font-semibold rounded-xl hover:bg-[#E04400] transition-colors">
           <Zap className="h-3.5 w-3.5" /> New Sale
@@ -145,7 +186,8 @@ export default function SalesHistoryPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Revenue", value: `Rs. ${totalRevenue.toLocaleString()}`, icon: TrendingUp, color: "bg-[#FF4C00] text-white", main: true },
+          { label: "Received Income", value: `Rs. ${totalReceived.toLocaleString()}`, icon: TrendingUp, color: "bg-[#FF4C00] text-white", main: true },
+          { label: "Pending", value: `Rs. ${totalPending.toLocaleString()}`, icon: Clock, color: "bg-amber-50 text-amber-700", main: false },
           { label: "TVS Commission", value: `Rs. ${totalTVS.toLocaleString()}`, icon: Bike, color: "bg-[#0A0A0A] text-white", main: false },
           { label: "Finance Commission", value: `Rs. ${totalFinance.toLocaleString()}`, icon: Building2, color: "bg-[#F5F5F5] text-[#6B6B6B]", main: false },
           { label: "Insurance Commission", value: `Rs. ${totalIns.toLocaleString()}`, icon: Shield, color: "bg-[#F5F5F5] text-[#6B6B6B]", main: false },
@@ -166,8 +208,8 @@ export default function SalesHistoryPage() {
       <div className="bg-white border border-[#E8E8E8] rounded-2xl p-5">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Revenue Trend</h3>
-            <p className="text-[11px] text-[#ABABAB] mt-0.5">Daily sales revenue for selected period</p>
+            <h3 className="text-[13px] font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Received Income Trend</h3>
+            <p className="text-[11px] text-[#ABABAB] mt-0.5">Revenue by date commissions were marked Received</p>
           </div>
           <div className="flex items-center gap-2">
             {/* Date filter tabs */}
@@ -214,7 +256,7 @@ export default function SalesHistoryPage() {
                 <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false}
                   tickFormatter={v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v / 1_000).toFixed(0)}K` : `${v}`} />
                 <Tooltip content={<CT />} />
-                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#FF4C00" strokeWidth={2.5} fill="url(#salesGrad)" dot={false} activeDot={{ r: 5, fill: "#FF4C00" }} />
+                <Area type="monotone" dataKey="revenue" name="Income" stroke="#FF4C00" strokeWidth={2.5} fill="url(#salesGrad)" dot={false} activeDot={{ r: 5, fill: "#FF4C00" }} />
               </AreaChart>
             ) : (
               <BarChart data={chartData} margin={{ top: 5, right: 10, left: -5, bottom: 0 }}>
@@ -223,7 +265,7 @@ export default function SalesHistoryPage() {
                   interval={chartData.length > 20 ? Math.floor(chartData.length / 12) : 0} />
                 <YAxis tick={{ fontSize: 10, fill: "#ABABAB" }} axisLine={false} tickLine={false}
                   tickFormatter={v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v / 1_000).toFixed(0)}K` : `${v}`} />
-                <Tooltip cursor={{ fill: "#F9F9F9" }} formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, "Revenue"]} />
+                <Tooltip cursor={{ fill: "#F9F9F9" }} formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, "Income"]} />
                 <Bar dataKey="revenue" fill="#FF4C00" shape={<RBar />} maxBarSize={28} />
               </BarChart>
             )}
@@ -234,7 +276,7 @@ export default function SalesHistoryPage() {
         <div className="flex items-center gap-6 pt-4 mt-1 border-t border-[#F5F5F5]">
           <div className="flex items-center gap-2">
             <span className="w-3 h-0.5 rounded bg-[#FF4C00]" />
-            <span className="text-[11px] text-[#9A9A9A] font-medium">Revenue</span>
+            <span className="text-[11px] text-[#9A9A9A] font-medium">Income</span>
           </div>
           <div className="h-4 w-px bg-[#F0F0F0]" />
           <div className="flex items-center gap-4 text-[11px] text-[#ABABAB]">
@@ -265,7 +307,7 @@ export default function SalesHistoryPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#F0F0F0]">
-                {["Invoice", "Date", "Customer", "Bike", "Payment", "Amount", "Commission", ""].map(h => (
+                {["Invoice", "Date", "Customer", "Bike", "Payment", "Vehicle Value", "Received", "Pending", ""].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[10px] font-bold text-[#ABABAB] uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -296,7 +338,6 @@ export default function SalesHistoryPage() {
                 </tr>
               ) : (
                 filtered.map(sale => {
-                  const comm = (sale.tvs_commission || 0) + (sale.finance_commission || 0) + (sale.insurance_commission || 0);
                   const payStyle = PAY[sale.payment_type] || { label: sale.payment_type, cls: "bg-[#F5F5F5] text-[#6B6B6B]" };
                   return (
                     <tr key={sale.id} className="border-b border-[#F8F8F8] last:border-0 hover:bg-[#FAFAFA] transition-colors group">
@@ -331,18 +372,16 @@ export default function SalesHistoryPage() {
                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${payStyle.cls}`}>{payStyle.label}</span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="text-[13px] font-bold text-[#0A0A0A] whitespace-nowrap">Rs. {sale.total_amount.toLocaleString()}</span>
+                        <span className="text-[12px] text-[#6B6B6B] whitespace-nowrap">Rs. {sale.total_amount.toLocaleString()}</span>
                       </td>
                       <td className="px-5 py-3.5">
-                        {comm > 0 ? (
-                          <div>
-                            <span className="text-[12px] font-bold text-emerald-600">Rs. {comm.toLocaleString()}</span>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              {sale.tvs_commission > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#FF4C00]/10 text-[#FF4C00]">TVS</span>}
-                              {sale.finance_commission > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">FIN</span>}
-                              {sale.insurance_commission > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600">INS</span>}
-                            </div>
-                          </div>
+                        {sale.received_income > 0 ? (
+                          <span className="text-[12px] font-bold text-emerald-600">Rs. {sale.received_income.toLocaleString()}</span>
+                        ) : <span className="text-[#D0D0D0]">—</span>}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {sale.pending_income > 0 ? (
+                          <span className="text-[12px] font-bold text-amber-600">Rs. {sale.pending_income.toLocaleString()}</span>
                         ) : <span className="text-[#D0D0D0]">—</span>}
                       </td>
                       <td className="px-5 py-3.5">
@@ -363,10 +402,13 @@ export default function SalesHistoryPage() {
                     <span className="text-[12px] font-bold text-[#0A0A0A]">Total ({filtered.length} sales)</span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className="text-[14px] font-bold text-[#FF4C00]">Rs. {totalRevenue.toLocaleString()}</span>
+                    <span className="text-[12px] font-semibold text-[#6B6B6B]">Rs. {totalVehicleValue.toLocaleString()}</span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className="text-[13px] font-bold text-emerald-600">Rs. {totalComm.toLocaleString()}</span>
+                    <span className="text-[14px] font-bold text-emerald-600">Rs. {totalReceived.toLocaleString()}</span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className="text-[13px] font-bold text-amber-600">Rs. {totalPending.toLocaleString()}</span>
                   </td>
                   <td />
                 </tr>

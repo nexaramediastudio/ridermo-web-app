@@ -70,8 +70,8 @@ export default function PayrollPage() {
       supabase.from("employees").select("id, full_name, type, employee_code, basic_salary, is_active").eq("is_active", true).order("full_name"),
       supabase.from("payroll").select("*").eq("month", month).eq("year", year),
       supabase.from("attendance").select("employee_id, status").gte("date", monthStart).lt("date", monthEnd),
-      // Sum worker commissions earned this month (attendance-checked at sale time)
-      supabase.from("worker_commissions").select("employee_id, amount").gte("sale_date", monthStart).lt("sale_date", monthEnd),
+      // Received worker commissions only (released when sale commissions are all received)
+      supabase.from("worker_commissions").select("employee_id, amount").eq("status", "received").gte("received_at", monthStart).lt("received_at", monthEnd),
     ]);
 
     const emps = empRes.data || [];
@@ -344,7 +344,7 @@ export default function PayrollPage() {
                               Rs. {entry.bike_commission.toLocaleString("en", { maximumFractionDigits: 0 })}
                             </span>
                             {emp.type === "worker" && (
-                              <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide mt-0.5">auto</p>
+                              <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide mt-0.5">received</p>
                             )}
                           </div>
                         ) : (

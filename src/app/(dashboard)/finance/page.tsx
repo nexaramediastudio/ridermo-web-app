@@ -10,8 +10,13 @@ import {
   ChevronRight, DollarSign, BarChart2, Receipt,
   Building2, Shield, ArrowUpRight,
 } from "lucide-react";
+import {
+  sumReceivedByCategory,
+  type CommissionCategory,
+} from "@/lib/finance/commission-records";
+import { CommissionsPanel } from "@/components/finance/commissions-panel";
 
-type FinanceTab = "overview" | "tvs_cheques" | "other_cheques" | "expenses";
+type FinanceTab = "overview" | "commissions" | "tvs_cheques" | "other_cheques" | "expenses";
 
 export default function FinancePage() {
   const [tab, setTab] = useState<FinanceTab>("overview");
@@ -20,7 +25,9 @@ export default function FinancePage() {
     pendingChequeAmount: number;
     overdueCount: number;
     monthExpenses: number;
-    monthRevenue: number;
+    monthIncome: number;
+    pendingCommissionAmount: number;
+    pendingCommissionCount: number;
     monthProfit: number;
     tvsCommission: number;
     financeCommission: number;
@@ -38,10 +45,11 @@ export default function FinancePage() {
     const in7Days = new Date(); in7Days.setDate(in7Days.getDate() + 7);
     const in7DaysStr = in7Days.toISOString().split("T")[0];
 
-    const [chequesRes, expensesRes, salesRes] = await Promise.all([
+    const [chequesRes, expensesRes, receivedCommR, pendingCommR] = await Promise.all([
       supabase.from("cheques").select("id, cheque_number, amount, payment_date, status, pay_to, type").eq("status", "pending"),
       supabase.from("expenses").select("amount").gte("expense_date", startOfMonth),
-      supabase.from("sales").select("total_amount, tvs_commission, finance_commission, insurance_commission").gte("sale_date", startOfMonth).eq("status", "completed"),
+      supabase.from("commission_records").select("amount, category").eq("status", "received").gte("received_at", startOfMonth),
+      supabase.from("commission_records").select("amount").eq("status", "pending"),
     ]);
 
     const pending = (chequesRes.data || []);
@@ -53,18 +61,24 @@ export default function FinancePage() {
       .slice(0, 5);
 
     const monthExpenses = (expensesRes.data || []).reduce((s, e) => s + e.amount, 0);
-    const monthRevenue = (salesRes.data || []).reduce((s, s2) => s + s2.total_amount, 0);
-    const tvsComm = (salesRes.data || []).reduce((s, s2) => s + (s2.tvs_commission || 0), 0);
-    const finComm = (salesRes.data || []).reduce((s, s2) => s + (s2.finance_commission || 0), 0);
-    const insComm = (salesRes.data || []).reduce((s, s2) => s + (s2.insurance_commission || 0), 0);
+    const receivedArr = receivedCommR.data || [];
+    const pendingArr = pendingCommR.data || [];
+    const monthIncome = receivedArr.reduce((s, r) => s + Number(r.amount || 0), 0);
+    const byCat = sumReceivedByCategory(receivedArr as { amount: number; status: "received"; category: CommissionCategory }[]);
+    const tvsComm = byCat.tvs;
+    const finComm = byCat.finance;
+    const insComm = byCat.insurance;
+    const pendingCommissionAmount = pendingArr.reduce((s, r) => s + Number(r.amount || 0), 0);
 
     setOverview({
       pendingCheques: pending.length,
       pendingChequeAmount: pendingTotal,
       overdueCount: overdue.length,
       monthExpenses,
-      monthRevenue,
-      monthProfit: monthRevenue - monthExpenses,
+      monthIncome,
+      pendingCommissionAmount,
+      pendingCommissionCount: pendingArr.length,
+      monthProfit: monthIncome - monthExpenses,
       tvsCommission: tvsComm,
       financeCommission: finComm,
       insuranceCommission: insComm,
@@ -77,6 +91,7 @@ export default function FinancePage() {
 
   const TABS = [
     { id: "overview" as FinanceTab, label: "Overview", icon: BarChart2 },
+    { id: "commissions" as FinanceTab, label: "Commissions", icon: Receipt },
     { id: "tvs_cheques" as FinanceTab, label: "TVS Cheques", icon: CreditCard },
     { id: "other_cheques" as FinanceTab, label: "Other Cheques", icon: CreditCard },
     { id: "expenses" as FinanceTab, label: "Expenses", icon: Wallet },
@@ -112,9 +127,9 @@ export default function FinancePage() {
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 bg-white rounded-2xl border border-[#EFEFEF] animate-pulse" />)
             ) : overview && [
-              { label: "This Month Revenue", value: `Rs. ${overview.monthRevenue.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: TrendingUp, accent: true, sub: `${overview.monthRevenue > 0 ? "From sales" : "No sales yet"}` },
+              { label: "Received This Month", value: `Rs. ${overview.monthIncome.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: TrendingUp, accent: true, sub: `${overview.monthIncome > 0 ? "Marked as received" : "No received commissions"}` },
               { label: "This Month Profit", value: `Rs. ${overview.monthProfit.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: DollarSign, accent: false, sub: `After Rs. ${overview.monthExpenses.toLocaleString("en", { maximumFractionDigits: 0 })} expenses` },
-              { label: "Pending Cheques", value: `Rs. ${overview.pendingChequeAmount.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: Clock, accent: false, sub: `${overview.pendingCheques} cheques pending` },
+              { label: "Pending Commissions", value: `Rs. ${overview.pendingCommissionAmount.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: Clock, accent: false, sub: `${overview.pendingCommissionCount} awaiting receipt` },
               { label: "Total Commission", value: `Rs. ${(overview.tvsCommission + overview.financeCommission + overview.insuranceCommission).toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: Receipt, accent: false, sub: "TVS + Finance + Insurance" },
             ].map(({ label, value, icon: Icon, accent, sub }) => (
               <div key={label} className={`bg-white rounded-2xl border p-4 ${accent ? "border-[#FF4C00]/20" : "border-[#EFEFEF]"}`}>
@@ -134,7 +149,7 @@ export default function FinancePage() {
           {overview && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 space-y-4">
-                <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Commission Breakdown — This Month</h3>
+                <h3 className="text-sm font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Received Commissions — This Month</h3>
                 {[
                   { label: "TVS Commission", value: overview.tvsCommission, icon: Receipt, color: "bg-[#FF4C00]/10 text-[#FF4C00]" },
                   { label: "Finance Commission", value: overview.financeCommission, icon: Building2, color: "bg-blue-50 text-blue-700" },
@@ -208,10 +223,10 @@ export default function FinancePage() {
           {/* Quick links */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
+              { label: "Commission Records", href: "/commissions", icon: Receipt, desc: "Mark received / not received" },
               { label: "TVS Cheques", href: "/cheques/tvs", icon: CreditCard, desc: "Manage TVS payments" },
               { label: "Other Cheques", href: "/cheques/other", icon: CreditCard, desc: "Other cheque payments" },
               { label: "Expenses", href: "/expenses", icon: Wallet, desc: "Monthly expense tracker" },
-              { label: "Reports", href: "/reports", icon: BarChart2, desc: "P&L and analytics" },
             ].map(({ label, href, icon: Icon, desc }) => (
               <Link key={href} href={href} className="bg-white rounded-2xl border border-[#EFEFEF] p-4 hover:border-[#FF4C00]/30 hover:shadow-[0_4px_16px_rgba(255,76,0,0.08)] transition-all group">
                 <div className="flex items-center justify-between mb-3">
@@ -228,7 +243,10 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* TVS Cheques tab → redirect feel */}
+      {tab === "commissions" && (
+        <CommissionsPanel onUpdated={loadOverview} />
+      )}
+
       {tab === "tvs_cheques" && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 p-3 bg-[#F5F5F5] rounded-xl text-xs text-[#6B6B6B]">

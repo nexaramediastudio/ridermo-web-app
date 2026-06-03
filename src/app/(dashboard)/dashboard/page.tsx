@@ -12,6 +12,7 @@ import {
   AreaChart, Area, BarChart, Bar,
   XAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { sumReceivedByCategory, type CommissionCategory } from "@/lib/finance/commission-records";
 
 // ─── Types ────────────────────────────────────────────────────────
 interface DashData {
@@ -23,7 +24,7 @@ interface DashData {
   tvsCommission: number; financeCommission: number; insuranceCommission: number;
   prevTvs: number; prevFinance: number; prevInsurance: number;
   presentToday: number; absentToday: number; leaveToday: number; totalEmployees: number;
-  recentSales: { id: string; invoice_number: string; customer_name: string; bike_model: string; total_amount: number; payment_type: string; sale_date: string }[];
+  recentSales: { id: string; invoice_number: string; customer_name: string; bike_model: string; dealership_income: number; payment_type: string; sale_date: string }[];
   inventoryByModel: { model: string; available: number; sold: number; reserved: number; total: number }[];
   revenueSeries: { label: string; revenue: number; expenses: number; profit: number }[];
   monthlySales: { month: string; sales: number }[];
@@ -94,45 +95,62 @@ export default function DashboardPage() {
     const in7 = new Date(); in7.setDate(in7.getDate() + 7);
     const in7Str = in7.toISOString().split("T")[0];
 
-    const [todayR, monthR, prevR, expR, invR, crR, plR, chqR, attR, recentR, profR] = await Promise.all([
-      supabase.from("sales").select("total_amount").eq("status", "completed").gte("sale_date", today),
-      supabase.from("sales").select("total_amount, tvs_commission, finance_commission, insurance_commission, payment_type, sale_date").eq("status", "completed").gte("sale_date", startOfMonth),
-      supabase.from("sales").select("total_amount, tvs_commission, finance_commission, insurance_commission").eq("status", "completed").gte("sale_date", startPrev).lt("sale_date", endPrev),
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    const nextMonthStart = now.getMonth() === 11
+      ? `${now.getFullYear() + 1}-01-01`
+      : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
+
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().split("T")[0];
+
+    const [todaySalesR, monthSalesCountR, todayCommR, monthCommR, prevCommR, histCommR, expR, invR, crR, plR, chqR, attR, recentR, profR] = await Promise.all([
+      supabase.from("sales").select("id").eq("status", "completed").gte("sale_date", today).lt("sale_date", tomorrowStr),
+      supabase.from("sales").select("id").eq("status", "completed").gte("sale_date", startOfMonth).lt("sale_date", nextMonthStart),
+      supabase.from("commission_records").select("amount, category, received_at").eq("status", "received").gte("received_at", today).lt("received_at", tomorrowStr),
+      supabase.from("commission_records").select("amount, category, received_at, sale_id, sales(payment_type)").eq("status", "received").gte("received_at", startOfMonth),
+      supabase.from("commission_records").select("amount, category").eq("status", "received").gte("received_at", startPrev).lt("received_at", endPrev),
+      supabase.from("commission_records").select("amount, received_at").eq("status", "received").gte("received_at", sixMonthsAgo),
       supabase.from("expenses").select("amount, expense_date").gte("expense_date", startOfMonth),
       supabase.from("inventory_bikes").select("status, purchase_price, bike_models(name)"),
       supabase.from("cr_plates").select("id").eq("cr_status", "pending"),
       supabase.from("cr_plates").select("id").eq("plate_status", "pending"),
       supabase.from("cheques").select("id, cheque_number, amount, payment_date, pay_to, type").eq("status", "pending").lte("payment_date", in7Str),
       supabase.from("attendance").select("status").eq("date", today),
-      supabase.from("sales").select("id, invoice_number, customers(full_name), inventory_bikes(bike_models(name)), total_amount, payment_type, status, sale_date").eq("status", "completed").order("created_at", { ascending: false }).limit(7),
+      supabase.from("sales").select("id, invoice_number, customers(full_name), inventory_bikes(bike_models(name)), payment_type, sale_date").eq("status", "completed").order("created_at", { ascending: false }).limit(7),
       supabase.from("profiles").select("full_name").limit(1).single(),
     ]);
 
-    const todayArr = todayR.data || [];
-    const monthArr = monthR.data || [];
-    const prevArr = prevR.data || [];
+    const todayCommArr = todayCommR.data || [];
+    const monthCommArr = monthCommR.data || [];
+    const prevCommArr = prevCommR.data || [];
+    const histCommArr = histCommR.data || [];
     const expArr = expR.data || [];
     const invArr = invR.data || [];
     const attArr = attR.data || [];
     const chqArr = chqR.data || [];
 
-    const todaySales = todayArr.reduce((s, r) => s + r.total_amount, 0);
-    const monthRevenue = monthArr.reduce((s, r) => s + r.total_amount, 0);
+    const todaySales = todayCommArr.reduce((s, r) => s + Number(r.amount || 0), 0);
+    const monthRevenue = monthCommArr.reduce((s, r) => s + Number(r.amount || 0), 0);
     const monthExpenses = expArr.reduce((s, r) => s + r.amount, 0);
-    const tvsComm = monthArr.reduce((s, r) => s + (r.tvs_commission || 0), 0);
-    const finComm = monthArr.reduce((s, r) => s + (r.finance_commission || 0), 0);
-    const insComm = monthArr.reduce((s, r) => s + (r.insurance_commission || 0), 0);
+    const monthByCat = sumReceivedByCategory(monthCommArr as unknown as { amount: number; status: "received"; category: CommissionCategory }[]);
+    const tvsComm = monthByCat.tvs;
+    const finComm = monthByCat.finance;
+    const insComm = monthByCat.insurance;
     const stockValue = invArr.filter(b => b.status === "available").reduce((s, b) => s + (b.purchase_price || 0), 0);
 
-    const salesByDate: Record<string, number> = {};
+    const incomeByDate: Record<string, number> = {};
     const expByDate: Record<string, number> = {};
-    for (const s of monthArr) { const d = s.sale_date?.split("T")[0] || today; salesByDate[d] = (salesByDate[d] || 0) + s.total_amount; }
+    for (const c of monthCommArr) {
+      const d = (c.received_at as string)?.split("T")[0] || today;
+      incomeByDate[d] = (incomeByDate[d] || 0) + Number(c.amount || 0);
+    }
     for (const e of expArr) { const d = e.expense_date?.split("T")[0] || today; expByDate[d] = (expByDate[d] || 0) + e.amount; }
     const revenueSeries: DashData["revenueSeries"] = [];
     const dCur = new Date(startOfMonth);
     while (dCur <= now) {
       const k = dCur.toISOString().split("T")[0];
-      const rev = salesByDate[k] || 0, exp = expByDate[k] || 0;
+      const rev = incomeByDate[k] || 0, exp = expByDate[k] || 0;
       revenueSeries.push({ label: `${dCur.getDate()} ${dCur.toLocaleString("en", { month: "short" })}`, revenue: rev, expenses: exp, profit: rev - exp });
       dCur.setDate(dCur.getDate() + 1);
     }
@@ -140,8 +158,12 @@ export default function DashboardPage() {
     const monthlySales: DashData["monthlySales"] = [];
     for (let i = 5; i >= 0; i--) {
       const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const ms = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
-      monthlySales.push({ month: m.toLocaleString("en", { month: "short" }), sales: monthArr.filter(x => x.sale_date?.startsWith(ms)).reduce((s, r) => s + r.total_amount, 0) });
+      const mStart = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-01`;
+      const mEnd = m.getMonth() === 11 ? `${m.getFullYear() + 1}-01-01` : `${m.getFullYear()}-${String(m.getMonth() + 2).padStart(2, "0")}-01`;
+      const monthIncome = histCommArr
+        .filter((c) => (c.received_at as string) >= mStart && (c.received_at as string) < mEnd)
+        .reduce((s, c) => s + Number(c.amount || 0), 0);
+      monthlySales.push({ month: m.toLocaleString("en", { month: "short" }), sales: monthIncome });
     }
 
     const modelMap: Record<string, { model: string; available: number; sold: number; reserved: number; total: number }> = {};
@@ -155,15 +177,31 @@ export default function DashboardPage() {
       else if (b.status === "reserved") modelMap[name].reserved++;
     }
 
-    const cashTotal = monthArr.filter(s => s.payment_type === "cash").reduce((s, r) => s + r.total_amount, 0);
-    const finTotal = monthArr.filter(s => s.payment_type === "finance").reduce((s, r) => s + r.total_amount, 0);
-    const insTotal = monthArr.filter(s => s.payment_type === "insurance").reduce((s, r) => s + r.total_amount, 0);
+    const payTypeIncome: Record<string, number> = { cash: 0, finance: 0, insurance: 0 };
+    for (const c of monthCommArr) {
+      const sale = Array.isArray(c.sales) ? c.sales[0] : c.sales;
+      const pt = (sale as { payment_type?: string } | null)?.payment_type || "cash";
+      payTypeIncome[pt] = (payTypeIncome[pt] || 0) + Number(c.amount || 0);
+    }
     const salesDist = [
-      { name: "Cash", value: cashTotal, color: "#FF4C00" },
-      { name: "Finance", value: finTotal, color: "#3B82F6" },
-      { name: "Insurance", value: insTotal, color: "#8B5CF6" },
+      { name: "Cash", value: payTypeIncome.cash || 0, color: "#FF4C00" },
+      { name: "Finance", value: payTypeIncome.finance || 0, color: "#3B82F6" },
+      { name: "Insurance", value: payTypeIncome.insurance || 0, color: "#8B5CF6" },
     ].filter(d => d.value > 0);
-    if (!salesDist.length) salesDist.push({ name: "No Sales", value: 1, color: "#E5E5E5" });
+    if (!salesDist.length) salesDist.push({ name: "No Income", value: 1, color: "#E5E5E5" });
+
+    const recentSaleIds = (recentR.data || []).map((s: { id: string }) => s.id);
+    let receivedBySale: Record<string, number> = {};
+    if (recentSaleIds.length) {
+      const { data: recents } = await supabase
+        .from("commission_records")
+        .select("sale_id, amount")
+        .in("sale_id", recentSaleIds)
+        .eq("status", "received");
+      for (const r of recents || []) {
+        receivedBySale[r.sale_id] = (receivedBySale[r.sale_id] || 0) + Number(r.amount || 0);
+      }
+    }
 
     const recentSales = (recentR.data || []).map((s: Record<string, unknown>) => {
       const c = Array.isArray(s.customers) ? s.customers[0] : s.customers;
@@ -173,21 +211,24 @@ export default function DashboardPage() {
         id: s.id as string, invoice_number: s.invoice_number as string,
         customer_name: (c as Record<string, string> | null)?.full_name || "—",
         bike_model: (bm as Record<string, string> | null)?.name || "—",
-        total_amount: s.total_amount as number, payment_type: s.payment_type as string,
+        dealership_income: receivedBySale[s.id as string] || 0,
+        payment_type: s.payment_type as string,
         sale_date: s.sale_date as string,
       };
     });
 
+    const prevByCat = sumReceivedByCategory(prevCommArr as unknown as { amount: number; status: "received"; category: CommissionCategory }[]);
+
     setData({
-      todaySales, todayCount: todayArr.length,
-      monthRevenue, monthCount: monthArr.length,
+      todaySales, todayCount: todaySalesR.data?.length || 0,
+      monthRevenue, monthCount: monthSalesCountR.data?.length || 0,
       monthExpenses, stockValue,
       pendingCR: crR.data?.length || 0, pendingPlates: plR.data?.length || 0,
       pendingCheques: chqArr.length, pendingChequeAmount: chqArr.reduce((s, c) => s + c.amount, 0),
       tvsCommission: tvsComm, financeCommission: finComm, insuranceCommission: insComm,
-      prevTvs: prevArr.reduce((s, r) => s + (r.tvs_commission || 0), 0),
-      prevFinance: prevArr.reduce((s, r) => s + (r.finance_commission || 0), 0),
-      prevInsurance: prevArr.reduce((s, r) => s + (r.insurance_commission || 0), 0),
+      prevTvs: prevByCat.tvs,
+      prevFinance: prevByCat.finance,
+      prevInsurance: prevByCat.insurance,
       presentToday: attArr.filter(a => a.status === "present").length,
       absentToday: attArr.filter(a => a.status === "absent").length,
       leaveToday: attArr.filter(a => ["casual_leave", "sick_leave", "annual_leave"].includes(a.status)).length,
@@ -278,7 +319,7 @@ export default function DashboardPage() {
                 {/* Revenue inline */}
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-[14px] font-bold text-[#374151] tabular-nums">{fmtFull(data.todaySales)}</span>
-                  <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">TODAY</span>
+                  <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">RECEIVED TODAY</span>
                 </div>
                 {/* Monthly % */}
                 <div>
@@ -293,7 +334,7 @@ export default function DashboardPage() {
               <div className="flex-1 min-w-0 flex flex-col">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">
-                    {fmtFull(data.monthRevenue)} MONTHLY REVENUE
+                    {fmtFull(data.monthRevenue)} RECEIVED THIS MONTH
                   </span>
                   <Link href="/sales/new"
                     className="flex items-center gap-1.5 h-7 px-3 bg-[#111827] text-white text-[11px] font-semibold rounded-lg hover:bg-[#1F2937] transition-colors flex-shrink-0">
@@ -304,7 +345,7 @@ export default function DashboardPage() {
                   <ResponsiveContainer width="100%" height={175}>
                     <BarChart data={weekData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={4}>
                       <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                      <Tooltip cursor={false} formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, "Revenue"]} />
+                      <Tooltip cursor={false} formatter={(v) => [`Rs. ${Number(v).toLocaleString()}`, "Income"]} />
                       <Bar dataKey="revenue" maxBarSize={36} shape={<WeekBar totalBars={weekData.length} />} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -332,9 +373,9 @@ export default function DashboardPage() {
                 <div className="w-10 h-10 rounded-xl bg-[#F3F4F6] flex items-center justify-center">
                   <DollarSign className="h-4.5 w-4.5 text-[#374151]" style={{ width: 18, height: 18 }} />
                 </div>
-                <span className="text-[15px] font-bold text-[#111827]" style={H}>Revenue &amp; Finance</span>
+                <span className="text-[15px] font-bold text-[#111827]" style={H}>Income &amp; Finance</span>
               </div>
-              <p className="text-[12px] text-[#9CA3AF] mb-1.5">Total revenue this month</p>
+              <p className="text-[12px] text-[#9CA3AF] mb-1.5">Received commissions &amp; charges this month</p>
               <div className="flex items-end gap-2.5 leading-none mb-1.5">
                 <span className="text-[34px] font-black text-[#111827] tabular-nums" style={H}>
                   {fmtFull(data.monthRevenue)}
@@ -582,7 +623,7 @@ export default function DashboardPage() {
                       <p className="text-[11px] text-[#9CA3AF] truncate">{s.bike_model}</p>
                     </div>
                     <div className="flex-shrink-0 text-right">
-                      <p className="text-[12px] font-bold text-[#111827] tabular-nums">Rs. {fmt(s.total_amount)}</p>
+                      <p className="text-[12px] font-bold text-[#111827] tabular-nums">Rs. {fmt(s.dealership_income)}</p>
                       <span className={`inline-block text-[9.5px] font-bold px-1.5 py-0.5 rounded-md mt-0.5 ${s.payment_type === "cash" ? "bg-[#ECFDF5] text-emerald-700" : s.payment_type === "finance" ? "bg-[#EFF6FF] text-blue-700" : "bg-[#F5F3FF] text-purple-700"}`}>
                         {s.payment_type.charAt(0).toUpperCase() + s.payment_type.slice(1)}
                       </span>

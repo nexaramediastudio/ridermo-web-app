@@ -8,6 +8,8 @@ import {
   Bike, User, CreditCard, CheckCircle2, ChevronRight,
   Search, X, Plus, Building2, Shield, AlertCircle, ArrowLeft,
 } from "lucide-react";
+import { calcDealershipIncome } from "@/lib/finance/dealership-income";
+import { createPendingCommissionRecords } from "@/lib/finance/commission-records";
 
 interface StockBike {
   id: string;
@@ -106,6 +108,9 @@ export default function NewSalePage() {
   const [finance, setFinance]   = useState({ company_id: "", loan_amount: "", approved_amount: "", commission: "", downpayment: "" });
   const [insurance, setInsurance] = useState({ company_id: "", amount: "", commission: "" });
   const [tvsCommission, setTvsCommission] = useState("");
+  const [transportCharges, setTransportCharges] = useState("");
+  const [documentationCharges, setDocumentationCharges] = useState("");
+  const [otherEarnings, setOtherEarnings] = useState("");
   const [discount, setDiscount]           = useState("");
 
   const searchBikes = useCallback(async (q: string) => {
@@ -146,6 +151,14 @@ export default function NewSalePage() {
   const finalPrice  = parseFloat(salePrice) || selectedBike?.selling_price || 0;
   const discountAmt = parseFloat(discount) || 0;
   const totalAmount = finalPrice - discountAmt;
+  const dealershipIncome = calcDealershipIncome({
+    tvs_commission: parseFloat(tvsCommission) || 0,
+    finance_commission: parseFloat(finance.commission) || 0,
+    insurance_commission: parseFloat(insurance.commission) || 0,
+    transport_charges: parseFloat(transportCharges) || 0,
+    documentation_charges: parseFloat(documentationCharges) || 0,
+    other_earnings: parseFloat(otherEarnings) || 0,
+  });
 
   function selectBike(bike: StockBike) {
     setSelectedBike(bike);
@@ -186,6 +199,9 @@ export default function NewSalePage() {
           insurance_amount: parseFloat(insurance.amount) || 0,
           insurance_commission: parseFloat(insurance.commission) || 0,
           tvs_commission: parseFloat(tvsCommission) || 0,
+          transport_charges: parseFloat(transportCharges) || 0,
+          documentation_charges: parseFloat(documentationCharges) || 0,
+          other_earnings: parseFloat(otherEarnings) || 0,
           status: "completed",
         })
         .select("id")
@@ -194,7 +210,17 @@ export default function NewSalePage() {
       await supabase.from("inventory_bikes").update({ status: "sold" }).eq("id", selectedBike!.id);
       await supabase.from("cr_number_plates").insert({ sale_id: sale.id, bike_id: selectedBike!.id, customer_id: customerId, cr_status: "pending", plate_status: "pending" });
 
-      // ── Auto-distribute worker commissions ───────────────────────
+      // ── Pending commission records (revenue recognized when marked Received) ──
+      await createPendingCommissionRecords(supabase, sale.id, {
+        tvs_commission: parseFloat(tvsCommission) || 0,
+        finance_commission: parseFloat(finance.commission) || 0,
+        insurance_commission: parseFloat(insurance.commission) || 0,
+        transport_charges: parseFloat(transportCharges) || 0,
+        documentation_charges: parseFloat(documentationCharges) || 0,
+        other_earnings: parseFloat(otherEarnings) || 0,
+      });
+
+      // ── Worker commissions (pending until sale commissions are all received) ──
       const saleDate = new Date().toISOString().split("T")[0];
       const { data: workers } = await supabase
         .from("employees")
@@ -220,6 +246,7 @@ export default function NewSalePage() {
             employee_id: w.id,
             sale_date: saleDate,
             amount: w.per_bike_commission,
+            status: "pending",
           }));
 
         if (commissions.length > 0) {
@@ -227,7 +254,7 @@ export default function NewSalePage() {
         }
       }
 
-      toast.success(`Sale completed! Invoice: ${invoiceNumber}`);
+      toast.success(`Sale completed! Invoice: ${invoiceNumber}. Commissions pending until marked Received.`);
       router.push(`/sales`);
     } catch (err: unknown) {
       toast.error((err as Error).message || "Failed to complete sale");
@@ -283,9 +310,10 @@ export default function NewSalePage() {
         {/* Financials */}
         <div className="space-y-2 pt-1 border-t border-[#F0F0F0]">
           {[
-            { label: "Sale Price",    value: finalPrice  > 0 ? `Rs. ${finalPrice.toLocaleString()}`  : "—" },
-            { label: "Discount",      value: discountAmt > 0 ? `- Rs. ${discountAmt.toLocaleString()}` : "—" },
-            { label: "Payment",       value: paymentType === "cash" ? "Cash" : "Finance" },
+            { label: "Vehicle Sale Price", value: finalPrice  > 0 ? `Rs. ${finalPrice.toLocaleString()}`  : "—" },
+            { label: "Discount",           value: discountAmt > 0 ? `- Rs. ${discountAmt.toLocaleString()}` : "—" },
+            { label: "Customer Pays",      value: totalAmount > 0 ? `Rs. ${totalAmount.toLocaleString()}` : "—" },
+            { label: "Payment",            value: paymentType === "cash" ? "Cash" : "Finance" },
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between">
               <span className="text-[11px] text-[#9A9A9A]">{label}</span>
@@ -294,13 +322,14 @@ export default function NewSalePage() {
           ))}
         </div>
 
-        {/* Total */}
-        {finalPrice > 0 && (
+        {/* Dealership income */}
+        {dealershipIncome > 0 && (
           <div className="pt-2 border-t border-[#F0F0F0]">
             <div className="flex items-center justify-between">
-              <span className="text-[12px] font-bold text-[#0A0A0A]">Total</span>
-              <span className="text-[16px] font-bold text-[#FF4C00]">Rs. {totalAmount.toLocaleString()}</span>
+              <span className="text-[12px] font-bold text-emerald-700">Dealership Income</span>
+              <span className="text-[16px] font-bold text-emerald-600">Rs. {dealershipIncome.toLocaleString()}</span>
             </div>
+            <p className="text-[10px] text-[#ABABAB] mt-1">Pending until marked Received in Finance</p>
           </div>
         )}
       </div>
@@ -579,6 +608,30 @@ export default function NewSalePage() {
                 </Field>
               </div>
 
+              {/* Dealership charges (actual revenue) */}
+              <div className="space-y-4 p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl">
+                <p className="text-[12px] font-semibold text-emerald-800 flex items-center gap-2">
+                  <CreditCard className="h-3.5 w-3.5" /> Dealership Earnings
+                  <span className="text-[10px] font-normal text-emerald-600">— counted as revenue</span>
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="Transport (Rs.)">
+                    <input type="number" value={transportCharges} onChange={(e) => setTransportCharges(e.target.value)} placeholder="0" className="r-input" />
+                  </Field>
+                  <Field label="Documentation (Rs.)">
+                    <input type="number" value={documentationCharges} onChange={(e) => setDocumentationCharges(e.target.value)} placeholder="0" className="r-input" />
+                  </Field>
+                  <Field label="Other Earnings (Rs.)">
+                    <input type="number" value={otherEarnings} onChange={(e) => setOtherEarnings(e.target.value)} placeholder="0" className="r-input" />
+                  </Field>
+                </div>
+                {dealershipIncome > 0 && (
+                  <p className="text-[11px] font-semibold text-emerald-700">
+                    Total dealership income from this sale: Rs. {dealershipIncome.toLocaleString()}
+                  </p>
+                )}
+              </div>
+
               {/* Finance details */}
               {paymentType === "finance" && (
                 <div className="space-y-4 p-4 bg-blue-50/60 border border-blue-100 rounded-xl">
@@ -705,23 +758,38 @@ export default function NewSalePage() {
 
               {/* Financials breakdown */}
               <div className="p-4 bg-[#FAFAFA] rounded-xl space-y-2.5">
-                <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider">Financial Summary</p>
+                <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider">Vehicle &amp; Customer</p>
                 {[
-                  { label: "Sale Price",            value: `Rs. ${finalPrice.toLocaleString()}` },
-                  { label: "Discount",              value: discountAmt > 0 ? `- Rs. ${discountAmt.toLocaleString()}` : "—" },
-                  { label: "Payment Type",          value: paymentType === "cash" ? "Full Cash" : "Finance" },
-                  ...(tvsCommission    ? [{ label: "TVS Commission",       value: `Rs. ${parseFloat(tvsCommission).toLocaleString()}` }]    : []),
-                  ...(insurance.commission ? [{ label: "Insurance Commission", value: `Rs. ${parseFloat(insurance.commission).toLocaleString()}` }] : []),
-                  ...(finance.commission   ? [{ label: "Finance Commission",   value: `Rs. ${parseFloat(finance.commission).toLocaleString()}` }]   : []),
+                  { label: "Vehicle Sale Price", value: `Rs. ${finalPrice.toLocaleString()}` },
+                  { label: "Discount",           value: discountAmt > 0 ? `- Rs. ${discountAmt.toLocaleString()}` : "—" },
+                  { label: "Customer Pays",      value: `Rs. ${totalAmount.toLocaleString()}` },
+                  { label: "Payment Type",       value: paymentType === "cash" ? "Full Cash" : "Finance" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-[12px] text-[#6B6B6B]">{label}</span>
                     <span className="text-[12px] font-semibold text-[#0A0A0A]">{value}</span>
                   </div>
                 ))}
-                <div className="border-t border-[#E8E8E8] pt-2.5 flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-[#0A0A0A]">Total Amount</span>
-                  <span className="text-[18px] font-bold text-[#FF4C00]">Rs. {totalAmount.toLocaleString()}</span>
+              </div>
+
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-2.5">
+                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Expected Dealership Income (Pending)</p>
+                {[
+                  ...(tvsCommission ? [{ label: "TVS Commission", value: `Rs. ${parseFloat(tvsCommission).toLocaleString()}` }] : []),
+                  ...(insurance.commission ? [{ label: "Insurance Commission", value: `Rs. ${parseFloat(insurance.commission).toLocaleString()}` }] : []),
+                  ...(finance.commission ? [{ label: "Finance Commission", value: `Rs. ${parseFloat(finance.commission).toLocaleString()}` }] : []),
+                  ...(transportCharges ? [{ label: "Transport Charges", value: `Rs. ${parseFloat(transportCharges).toLocaleString()}` }] : []),
+                  ...(documentationCharges ? [{ label: "Documentation Charges", value: `Rs. ${parseFloat(documentationCharges).toLocaleString()}` }] : []),
+                  ...(otherEarnings ? [{ label: "Other Earnings", value: `Rs. ${parseFloat(otherEarnings).toLocaleString()}` }] : []),
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-[12px] text-emerald-800">{label}</span>
+                    <span className="text-[12px] font-semibold text-emerald-900">{value}</span>
+                  </div>
+                ))}
+                <div className="border-t border-emerald-200 pt-2.5 flex items-center justify-between">
+                  <span className="text-[13px] font-bold text-emerald-800">Total Expected Income</span>
+                  <span className="text-[18px] font-bold text-emerald-600">Rs. {dealershipIncome.toLocaleString()}</span>
                 </div>
               </div>
 

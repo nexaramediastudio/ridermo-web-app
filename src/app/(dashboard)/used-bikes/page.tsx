@@ -137,7 +137,7 @@ export default function UsedBikesPage() {
   const total = bikes.length;
   const available = bikes.filter(b => b.status === "available").length;
   const soldCount = bikes.filter(b => b.status === "sold").length;
-  const totalRevenue = bikes.filter(b => b.status === "sold").reduce((s, b) => s + b.selling_price, 0);
+  const totalSaleValue = bikes.filter(b => b.status === "sold").reduce((s, b) => s + b.selling_price, 0);
 
   const F = (k: keyof UsedBike, v: unknown) => setForm(p => ({ ...p, [k]: v }));
 
@@ -160,7 +160,7 @@ export default function UsedBikesPage() {
           { label: "Total Bikes", value: total, icon: Bike, accent: false },
           { label: "Available", value: available, icon: Package, accent: true },
           { label: "Sold", value: soldCount, icon: CheckCircle2, accent: false },
-          { label: "Total Revenue", value: `Rs. ${totalRevenue.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: TrendingUp, accent: false },
+          { label: "Sold Value", value: `Rs. ${totalSaleValue.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: TrendingUp, accent: false },
         ].map(({ label, value, icon: Icon, accent }) => (
           <div key={label} className="bg-white rounded-xl border border-[#E8E8E8] px-4 py-3 flex items-center justify-between gap-3 hover:border-[#D0D0D0] transition-colors">
             <div>
