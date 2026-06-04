@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Calendar, ChevronLeft, ChevronRight, Save, UserCheck, UserX, Clock, Stethoscope, Umbrella, Sun } from "lucide-react";
+import { syncWorkerCommissionsForDate } from "@/lib/hr/worker-commissions";
 
 type AttendanceStatus = "present" | "absent" | "half_day" | "sick_leave" | "casual_leave" | "holiday";
 
@@ -102,7 +103,20 @@ export default function AttendancePage() {
 
     if (error) toast.error(error.message);
     else {
-      toast.success("Attendance saved successfully");
+      try {
+        const { added, removed } = await syncWorkerCommissionsForDate(supabase, selectedDate);
+        if (added > 0) {
+          toast.success(
+            `Attendance saved — ${added} bike commission${added !== 1 ? "s" : ""} added for sales on this date`
+          );
+        } else if (removed > 0) {
+          toast.success(`Attendance saved — ${removed} bike commission${removed !== 1 ? "s" : ""} removed`);
+        } else {
+          toast.success("Attendance saved successfully");
+        }
+      } catch (syncErr) {
+        toast.error((syncErr as Error).message || "Attendance saved but bike commissions failed to sync");
+      }
       setHasExisting(true);
     }
     setSaving(false);

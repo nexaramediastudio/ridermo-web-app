@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, DollarSign, Users,
-  CheckCircle2, Clock, AlertCircle, RefreshCw, Eye,
+  CheckCircle2, AlertCircle, RefreshCw,
 } from "lucide-react";
+import { syncWorkerCommissionsForMonth } from "@/lib/hr/worker-commissions";
+import { calculatePayroll, summarizeAttendance } from "@/lib/hr/payroll-calc";
 
 interface Employee {
   id: string;
@@ -14,6 +16,10 @@ interface Employee {
   type: "director" | "worker";
   employee_code?: string;
   basic_salary: number;
+  hourly_rate: number;
+  salary_type: "monthly" | "hourly";
+  has_epf: boolean;
+  has_etf: boolean;
   is_active: boolean;
 }
 
@@ -36,12 +42,11 @@ interface PayrollEntry {
   working_days: number;
   present_days: number;
   absent_days: number;
+  hours_worked?: number;
   status: "draft" | "approved" | "paid";
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const EPF_RATE = 0.08; // Employee EPF 8%
-const ETF_RATE = 0.03; // ETF 3%
 
 const STATUS_STYLES = {
   draft: "bg-[#F5F5F5] text-[#6B6B6B]",
@@ -66,12 +71,18 @@ export default function PayrollPage() {
     const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
     const monthEnd   = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, "0")}-01`;
 
+    await syncWorkerCommissionsForMonth(supabase, year, month);
+
     const [empRes, payRes, attRes, commRes] = await Promise.all([
-      supabase.from("employees").select("id, full_name, type, employee_code, basic_salary, is_active").eq("is_active", true).order("full_name"),
+      supabase.from("employees").select("id, full_name, type, employee_code, basic_salary, hourly_rate, salary_type, has_epf, has_etf, is_active").eq("is_active", true).order("full_name"),
       supabase.from("payroll").select("*").eq("month", month).eq("year", year),
-      supabase.from("attendance").select("employee_id, status").gte("date", monthStart).lt("date", monthEnd),
-      // Received worker commissions only (released when sale commissions are all received)
-      supabase.from("worker_commissions").select("employee_id, amount").eq("status", "received").gte("received_at", monthStart).lt("received_at", monthEnd),
+      supabase.from("attendance").select("employee_id, status, ot_hours").gte("date", monthStart).lt("date", monthEnd),
+      // All bike commissions for sales in this month — salary, not tied to dealership commission received
+      supabase
+        .from("worker_commissions")
+        .select("employee_id, amount")
+        .gte("sale_date", monthStart)
+        .lt("sale_date", monthEnd),
     ]);
 
     const emps = empRes.data || [];
@@ -79,21 +90,12 @@ export default function PayrollPage() {
     const attRecords = attRes.data || [];
     const commRecords = commRes.data || [];
 
-    // Build attendance counts per employee
-    const attCounts: Record<string, { present: number; absent: number; total: number; ot: number }> = {};
+    const attByEmp: Record<string, { status: string; ot_hours?: number | null }[]> = {};
     attRecords.forEach((rec) => {
-      if (!attCounts[rec.employee_id]) {
-        attCounts[rec.employee_id] = { present: 0, absent: 0, total: 0, ot: 0 };
-      }
-      attCounts[rec.employee_id].total++;
-      if (rec.status === "present" || rec.status === "half_day") {
-        attCounts[rec.employee_id].present += rec.status === "half_day" ? 0.5 : 1;
-      } else if (rec.status === "absent") {
-        attCounts[rec.employee_id].absent++;
-      }
+      if (!attByEmp[rec.employee_id]) attByEmp[rec.employee_id] = [];
+      attByEmp[rec.employee_id].push(rec);
     });
 
-    // Sum commissions per employee
     const commTotals: Record<string, number> = {};
     commRecords.forEach((c) => {
       commTotals[c.employee_id] = (commTotals[c.employee_id] || 0) + Number(c.amount);
@@ -105,50 +107,43 @@ export default function PayrollPage() {
     const payMap: Record<string, PayrollEntry> = {};
     emps.forEach((emp) => {
       const existing = existingPayroll.find((p) => p.employee_id === emp.id);
-      if (existing) {
-        payMap[emp.id] = existing;
-      } else {
-        const att = attCounts[emp.id] || { present: 0, absent: 0, total: 0, ot: 0 };
-        const STANDARD_DAYS = 26;
-        const workingDays = STANDARD_DAYS;
-        const presentDays = att.present;
-        const absentDays = Math.max(0, workingDays - presentDays);
+      const attSummary = summarizeAttendance(attByEmp[emp.id] || []);
+      const calc = calculatePayroll({
+        salaryType: emp.salary_type || "monthly",
+        basicSalary: Number(emp.basic_salary || 0),
+        hourlyRate: Number(emp.hourly_rate || 0),
+        hasEpf: emp.has_epf ?? false,
+        hasEtf: emp.has_etf ?? false,
+        attendance: attSummary,
+        bikeCommission: emp.type === "worker" ? commTotals[emp.id] || 0 : 0,
+        attendanceBonus: existing?.attendance_bonus ?? 0,
+        otPay: existing?.ot_pay ?? 0,
+        bonus: existing?.bonus ?? 0,
+        otherDeductions: existing?.other_deductions ?? 0,
+      });
 
-        // Earned basic = full basic × (days present / standard working days)
-        const earnedBasic = presentDays > 0
-          ? Math.round((emp.basic_salary / workingDays) * presentDays)
-          : 0;
-
-        // Auto-loaded bike commission (only workers; directors get 0)
-        const bikeCommission = emp.type === "worker" ? Math.round(commTotals[emp.id] || 0) : 0;
-
-        const gross = earnedBasic + bikeCommission;
-        const epfAmt = emp.type === "worker" ? Math.round(gross * EPF_RATE) : 0;
-        const etfAmt = emp.type === "worker" ? Math.round(gross * ETF_RATE) : 0;
-        const totalDed = epfAmt + etfAmt;
-        const net = gross - totalDed;
-
-        payMap[emp.id] = {
-          employee_id: emp.id,
-          month,
-          year,
-          basic_salary: earnedBasic,
-          attendance_bonus: 0,
-          ot_pay: 0,
-          bike_commission: bikeCommission,
-          bonus: 0,
-          gross_salary: gross,
-          epf_employee: epfAmt,
-          etf: etfAmt,
-          other_deductions: 0,
-          total_deductions: totalDed,
-          net_salary: net,
-          working_days: workingDays,
-          present_days: presentDays,
-          absent_days: absentDays,
-          status: "draft",
-        };
-      }
+      payMap[emp.id] = {
+        id: existing?.id,
+        employee_id: emp.id,
+        month,
+        year,
+        basic_salary: calc.earnedBasic,
+        attendance_bonus: existing?.attendance_bonus ?? 0,
+        ot_pay: existing?.ot_pay ?? 0,
+        bike_commission: calc.bikeCommission,
+        bonus: existing?.bonus ?? 0,
+        gross_salary: calc.gross,
+        epf_employee: calc.epf,
+        etf: calc.etf,
+        other_deductions: existing?.other_deductions ?? 0,
+        total_deductions: calc.totalDeductions,
+        net_salary: calc.net,
+        working_days: calc.workingDays,
+        present_days: calc.presentDays,
+        absent_days: calc.absentDays,
+        hours_worked: calc.hoursWorked,
+        status: existing?.status ?? "draft",
+      };
     });
     setPayroll(payMap);
     setLoading(false);
@@ -160,9 +155,9 @@ export default function PayrollPage() {
     const current = { ...payroll[empId], ...entry };
     const gross = current.basic_salary + current.attendance_bonus + current.ot_pay + current.bike_commission + current.bonus;
     const emp = employees.find((e) => e.id === empId);
-    const epf = emp?.type === "worker" ? gross * EPF_RATE : 0;
-    const etf = emp?.type === "worker" ? gross * ETF_RATE : 0;
-    const totalDed = epf + current.other_deductions;
+    const epf = emp?.has_epf ? Math.round(gross * 0.08) : 0;
+    const etf = emp?.has_etf ? Math.round(gross * 0.03) : 0;
+    const totalDed = epf + etf + (current.other_deductions || 0);
     const net = gross - totalDed;
     setPayroll((prev) => ({
       ...prev,
@@ -173,7 +168,7 @@ export default function PayrollPage() {
   async function handleSaveAll() {
     setSaving(true);
     const supabase = createClient();
-    const records = Object.values(payroll).map((p) => ({ ...p }));
+    const records = Object.values(payroll).map(({ hours_worked: _h, ...p }) => p);
     const { error } = await supabase.from("payroll").upsert(records, { onConflict: "employee_id,month,year" });
     if (error) toast.error(error.message);
     else { toast.success("Payroll saved"); loadPayroll(); }
@@ -344,7 +339,9 @@ export default function PayrollPage() {
                               Rs. {entry.bike_commission.toLocaleString("en", { maximumFractionDigits: 0 })}
                             </span>
                             {emp.type === "worker" && (
-                              <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide mt-0.5">received</p>
+                              <p className="text-[9px] font-bold text-amber-600 uppercase tracking-wide mt-0.5">
+                                per bike sold
+                              </p>
                             )}
                           </div>
                         ) : (
@@ -439,9 +436,10 @@ export default function PayrollPage() {
           <p>• <strong>Earned Basic</strong> = Full Basic Salary × (Days Present ÷ 26 working days)</p>
           <p>• Workers: EPF 8% + ETF 3% deducted from gross salary</p>
           <p>• Directors: No EPF/ETF deductions</p>
-          <p>• Absent workers receive no commission</p>
-          <p>• Click <strong>Edit</strong> on any row to manually adjust commission, bonus or OT pay</p>
-          <p>• Click <strong>Recalculate</strong> to recompute from latest attendance records</p>
+          <p>• <strong>Monthly</strong> = basic ÷ 26 × days present · <strong>Hourly</strong> = rate × hours (8h/day + OT from attendance)</p>
+          <p>• EPF/ETF only if ticked on the employee profile</p>
+          <p>• Bike commission counts when present on sale date — save attendance, then <strong>Recalculate</strong></p>
+          <p>• Generate slips per employee under <strong>Payslips</strong> after saving payroll</p>
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ import {
   AlertCircle,
   PackagePlus,
 } from "lucide-react";
+import { deleteSale, DELETE_SALE_CONFIRM_MESSAGE } from "@/lib/sales/delete-sale";
 
 const STATUS_STYLES = {
   in_stock: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -67,6 +68,29 @@ export default function InventoryBikesPage() {
     else setBikes(data || []);
     setLoading(false);
   }, [statusFilter, searchQuery]);
+
+  async function removeSoldBike(bike: InventoryBike) {
+    if (!window.confirm(`${DELETE_SALE_CONFIRM_MESSAGE}\n\n${bike.round_number}`)) return;
+    const supabase = createClient();
+    const { data: sale } = await supabase
+      .from("sales")
+      .select("id")
+      .eq("bike_id", bike.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!sale) {
+      toast.error("No sale found for this bike");
+      return;
+    }
+    try {
+      await deleteSale(supabase, sale.id);
+      toast.success(`${bike.round_number} removed from sales — back in stock`);
+      loadBikes();
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to remove sale");
+    }
+  }
 
   async function deleteBike(id: string, roundNum: string) {
     if (!window.confirm(`Delete bike ${roundNum}? This cannot be undone.`)) return;
@@ -281,13 +305,24 @@ export default function InventoryBikesPage() {
                       </span>
                     </td>
                     <td className="r-td">
-                      <button
-                        onClick={() => deleteBike(bike.id, bike.round_number)}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
-                        title="Delete bike"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {bike.status === "sold" ? (
+                        <button
+                          onClick={() => removeSoldBike(bike)}
+                          className="w-auto h-7 px-2.5 flex items-center gap-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] text-[11px] font-semibold transition-all"
+                          title="Remove sale and return bike to stock"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove Sale
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => deleteBike(bike.id, bike.round_number)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
+                          title="Delete bike"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

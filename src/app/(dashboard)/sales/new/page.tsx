@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { calcDealershipIncome } from "@/lib/finance/dealership-income";
 import { createPendingCommissionRecords } from "@/lib/finance/commission-records";
+import { syncWorkerCommissionsForDate } from "@/lib/hr/worker-commissions";
 
 interface StockBike {
   id: string;
@@ -220,39 +221,9 @@ export default function NewSalePage() {
         other_earnings: parseFloat(otherEarnings) || 0,
       });
 
-      // ── Worker commissions (pending until sale commissions are all received) ──
+      // ── Worker commissions (synced from attendance for sale date) ──
       const saleDate = new Date().toISOString().split("T")[0];
-      const { data: workers } = await supabase
-        .from("employees")
-        .select("id, per_bike_commission")
-        .eq("type", "worker")
-        .eq("is_active", true)
-        .gt("per_bike_commission", 0);
-
-      if (workers && workers.length > 0) {
-        const workerIds = workers.map((w) => w.id);
-        const { data: attendance } = await supabase
-          .from("attendance")
-          .select("employee_id, status")
-          .eq("date", saleDate)
-          .in("employee_id", workerIds)
-          .in("status", ["present", "half_day"]);
-
-        const presentIds = new Set((attendance || []).map((a) => a.employee_id));
-        const commissions = workers
-          .filter((w) => presentIds.has(w.id))
-          .map((w) => ({
-            sale_id: sale.id,
-            employee_id: w.id,
-            sale_date: saleDate,
-            amount: w.per_bike_commission,
-            status: "pending",
-          }));
-
-        if (commissions.length > 0) {
-          await supabase.from("worker_commissions").insert(commissions);
-        }
-      }
+      await syncWorkerCommissionsForDate(supabase, saleDate);
 
       toast.success(`Sale completed! Invoice: ${invoiceNumber}. Commissions pending until marked Received.`);
       router.push(`/sales`);

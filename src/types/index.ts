@@ -76,6 +76,11 @@ export interface Employee {
   department?: string;
   designation?: string;
   basic_salary: number;
+  per_bike_commission?: number;
+  salary_type?: "monthly" | "hourly";
+  hourly_rate?: number;
+  has_epf?: boolean;
+  has_etf?: boolean;
   join_date?: string;
   is_active: boolean;
 }

@@ -7,6 +7,7 @@ import {
   Plus, Search, CreditCard, AlertTriangle, Bike,
   CheckCircle2, XCircle, Clock, X, DollarSign, TrendingUp, Trash2,
 } from "lucide-react";
+import { deleteSale, DELETE_SALE_CONFIRM_MESSAGE } from "@/lib/sales/delete-sale";
 
 type ChequeStatus = "pending" | "successful" | "returned";
 
@@ -89,6 +90,7 @@ export function TvsChequesView() {
   const [statusFilter, setStatusFilter] = useState<"all" | ChequeStatus>("all");
   const [showAdd, setShowAdd] = useState(false);
   const [preselectedSaleId, setPreselectedSaleId] = useState<string | null>(null);
+  const [removingSaleId, setRemovingSaleId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -183,6 +185,25 @@ export function TvsChequesView() {
     loadData();
   }
 
+  async function handleRemoveSale(sale: SaleBike) {
+    const info = resolveSale({ sales: sale });
+    if (!window.confirm(`${DELETE_SALE_CONFIRM_MESSAGE}\n\n${info.roundNumber} — ${info.bike}`)) return;
+    setRemovingSaleId(sale.id);
+    try {
+      const supabase = createClient();
+      const result = await deleteSale(supabase, sale.id);
+      toast.success(
+        result.roundNumber
+          ? `Sale removed — ${result.roundNumber} back in stock`
+          : `Sale ${result.invoiceNumber} removed`
+      );
+      loadData();
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to remove sale");
+    }
+    setRemovingSaleId(null);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -266,7 +287,7 @@ export function TvsChequesView() {
                   <th className="r-th">Customer</th>
                   <th className="r-th">Sale Date</th>
                   <th className="r-th text-right">Selling Price</th>
-                  <th className="r-th">Action</th>
+                  <th className="r-th">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -287,12 +308,23 @@ export function TvsChequesView() {
                         <span className="text-[13px] font-bold text-[#0A0A0A] tabular-nums">Rs. {info.sellingPrice.toLocaleString()}</span>
                       </td>
                       <td className="r-td">
-                        <button
-                          onClick={() => openAddForSale(sale.id)}
-                          className="flex items-center gap-1 h-8 px-3 bg-[#FF4C00] hover:bg-[#E04400] text-white text-[11px] font-semibold rounded-lg whitespace-nowrap"
-                        >
-                          <Plus className="h-3.5 w-3.5" /> Write Cheque
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => openAddForSale(sale.id)}
+                            className="flex items-center gap-1 h-8 px-3 bg-[#FF4C00] hover:bg-[#E04400] text-white text-[11px] font-semibold rounded-lg whitespace-nowrap"
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Write Cheque
+                          </button>
+                          <button
+                            onClick={() => handleRemoveSale(sale)}
+                            disabled={removingSaleId === sale.id}
+                            className="flex items-center gap-1 h-8 px-3 bg-[#F5F5F5] hover:bg-red-50 hover:text-red-600 text-[#6B6B6B] text-[11px] font-semibold rounded-lg border border-[#E8E8E8] disabled:opacity-60 whitespace-nowrap"
+                            title="Remove sale and return bike to stock"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {removingSaleId === sale.id ? "Removing..." : "Remove Sale"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

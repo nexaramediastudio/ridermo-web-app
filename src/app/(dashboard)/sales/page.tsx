@@ -7,8 +7,9 @@ import Link from "next/link";
 import {
   Plus, Search, FileText, TrendingUp, Bike, User,
   CreditCard, ArrowRight, Building2, Shield, Zap,
-  ArrowUpRight, ArrowDownRight, ShoppingCart, Clock,
+  ArrowUpRight, ArrowDownRight, ShoppingCart, Clock, Trash2,
 } from "lucide-react";
+import { deleteSale, DELETE_SALE_CONFIRM_MESSAGE } from "@/lib/sales/delete-sale";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar,
@@ -67,6 +68,7 @@ export default function SalesHistoryPage() {
   const [dateFilter, setDateFilter] = useState("month");
   const [chartType, setChartType] = useState<"area" | "bar">("area");
   const [chartData, setChartData] = useState<{ label: string; revenue: number; count: number }[]>([]);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const now = new Date();
 
@@ -149,6 +151,25 @@ export default function SalesHistoryPage() {
   }, [dateFilter]);
 
   useEffect(() => { loadSales(); }, [loadSales]);
+
+  async function handleRemoveSale(sale: SaleRow) {
+    const label = sale.inventory_bikes?.round_number || sale.invoice_number;
+    if (!window.confirm(`${DELETE_SALE_CONFIRM_MESSAGE}\n\n${label}`)) return;
+    setRemovingId(sale.id);
+    try {
+      const supabase = createClient();
+      const result = await deleteSale(supabase, sale.id);
+      toast.success(
+        result.roundNumber
+          ? `Sale removed — ${result.roundNumber} back in stock`
+          : `Sale ${result.invoiceNumber} removed`
+      );
+      loadSales();
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to remove sale");
+    }
+    setRemovingId(null);
+  }
 
   const filtered = sales.filter(s => {
     if (!search) return true;
@@ -307,7 +328,7 @@ export default function SalesHistoryPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#F0F0F0]">
-                {["Invoice", "Date", "Customer", "Bike", "Payment", "Vehicle Value", "Received", "Pending", ""].map(h => (
+                {["Invoice", "Date", "Customer", "Bike", "Payment", "Vehicle Value", "Received", "Pending", "Actions"].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[10px] font-bold text-[#ABABAB] uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -385,9 +406,20 @@ export default function SalesHistoryPage() {
                         ) : <span className="text-[#D0D0D0]">—</span>}
                       </td>
                       <td className="px-5 py-3.5">
-                        <Link href={`/sales/invoices`} className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[11px] text-[#FF4C00] font-semibold transition-all">
-                          Invoice <ArrowRight className="h-3 w-3" />
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/sales/invoices`} className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[11px] text-[#FF4C00] font-semibold transition-all">
+                            Invoice <ArrowRight className="h-3 w-3" />
+                          </Link>
+                          <button
+                            onClick={() => handleRemoveSale(sale)}
+                            disabled={removingId === sale.id}
+                            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 h-7 px-2.5 rounded-lg hover:bg-red-50 hover:text-red-600 text-[#ABABAB] text-[11px] font-semibold transition-all disabled:opacity-60"
+                            title="Remove sale and return bike to stock"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {removingId === sale.id ? "Removing..." : "Remove"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

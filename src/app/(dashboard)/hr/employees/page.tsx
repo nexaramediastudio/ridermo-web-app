@@ -5,41 +5,23 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   Plus, Search, User, Phone, CreditCard, Briefcase,
-  X, UserCheck, UserX, Star, Trash2,
+  Star, Trash2, Pencil,
 } from "lucide-react";
-
-interface Employee {
-  id: string;
-  employee_code?: string;
-  full_name: string;
-  phone?: string;
-  nic?: string;
-  designation?: string;
-  department?: string;
-  type: "director" | "worker";
-  basic_salary: number;
-  per_bike_commission: number;
-  join_date?: string;
-  is_active: boolean;
-  created_at: string;
-}
+import { EmployeeFormModal, type EmployeeRecord } from "@/components/hr/employee-form-modal";
 
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "director" | "worker">("all");
+  const [modalEmployee, setModalEmployee] = useState<EmployeeRecord | null | undefined>(undefined);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("employees")
-      .select("*")
-      .order("full_name");
+    const { data, error } = await supabase.from("employees").select("*").order("full_name");
     if (error) toast.error("Failed to load employees");
-    else setEmployees(data || []);
+    else setEmployees((data as EmployeeRecord[]) || []);
     setLoading(false);
   }, []);
 
@@ -75,7 +57,6 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#FF4C00]/10 flex items-center justify-center">
@@ -86,20 +67,16 @@ export default function EmployeesPage() {
             <p className="r-page-sub">{active} active · {directors} director{directors !== 1 ? "s" : ""}</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="r-btn-primary"
-        >
+        <button onClick={() => setModalEmployee(null)} className="r-btn-primary">
           <Plus className="h-4 w-4" /> Add Employee
         </button>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Employees",  value: employees.length, color: "text-[#0A0A0A]" },
-          { label: "Active",           value: active,           color: "text-emerald-600" },
-          { label: "Directors",        value: directors,        color: "text-[#FF4C00]" },
+          { label: "Total Employees", value: employees.length, color: "text-[#0A0A0A]" },
+          { label: "Active", value: active, color: "text-emerald-600" },
+          { label: "Directors", value: directors, color: "text-[#FF4C00]" },
         ].map((k) => (
           <div key={k.label} className="r-kpi">
             <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">{k.label}</p>
@@ -108,133 +85,89 @@ export default function EmployeesPage() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#ABABAB]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, phone, NIC..."
-            className="r-input pl-9 max-w-sm"
-          />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, phone, NIC..." className="r-input pl-9 max-w-sm" />
         </div>
         <div className="r-tabs">
           {(["all", "director", "worker"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTypeFilter(t)}
-              className={typeFilter === t ? "r-tab-on" : "r-tab-off"}
-            >
+            <button key={t} onClick={() => setTypeFilter(t)} className={typeFilter === t ? "r-tab-on" : "r-tab-off"}>
               {t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1) + "s"}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="r-card p-5 animate-pulse">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#F0F0F0]" />
-                <div className="space-y-2 flex-1">
-                  <div className="h-4 bg-[#F0F0F0] rounded w-3/4" />
-                  <div className="h-3 bg-[#F0F0F0] rounded w-1/2" />
-                </div>
-              </div>
-            </div>
+            <div key={i} className="r-card p-5 animate-pulse"><div className="h-20 bg-[#F0F0F0] rounded" /></div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="r-card p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mx-auto mb-3">
-            <User className="h-7 w-7 text-[#ABABAB]" />
-          </div>
+          <User className="h-8 w-8 mx-auto mb-2 text-[#ABABAB]" />
           <p className="text-[13px] font-semibold text-[#4A4A4A]">No employees found</p>
-          <p className="text-[11px] text-[#ABABAB] mt-1">Add your first employee to get started</p>
-          <button onClick={() => setShowAdd(true)} className="mt-4 r-btn-primary mx-auto">
+          <button onClick={() => setModalEmployee(null)} className="mt-4 r-btn-primary mx-auto">
             <Plus className="h-4 w-4" /> Add Employee
           </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((emp) => (
-            <div
-              key={emp.id}
-              className={`r-card p-5 transition-colors hover:border-[#D0D0D0] ${!emp.is_active ? "opacity-60" : ""}`}
-            >
+            <div key={emp.id} className={`r-card p-5 transition-colors hover:border-[#D0D0D0] ${!emp.is_active ? "opacity-60" : ""}`}>
               <div className="flex items-start gap-3">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 text-base font-bold ${emp.type === "director" ? "bg-[#FF4C00]/15 text-[#FF4C00]" : "bg-[#F5F5F5] text-[#6B6B6B]"}`}>
                   {emp.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-bold text-[#0A0A0A] truncate">{emp.full_name}</p>
-                    {emp.type === "director" && (
-                      <Star className="h-3.5 w-3.5 text-[#FF4C00] fill-[#FF4C00] flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-[#9A9A9A] mt-0.5">
-                    {emp.designation || emp.type.charAt(0).toUpperCase() + emp.type.slice(1)}
-                    {emp.department && ` · ${emp.department}`}
-                  </p>
+                  <p className="text-sm font-bold text-[#0A0A0A] truncate">{emp.full_name}</p>
+                  <p className="text-xs text-[#9A9A9A] mt-0.5 capitalize">{emp.designation || emp.type}</p>
                 </div>
-                <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${emp.is_active ? "bg-emerald-50 text-emerald-700" : "bg-[#F0F0F0] text-[#9A9A9A]"}`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${emp.is_active ? "bg-emerald-50 text-emerald-700" : "bg-[#F0F0F0] text-[#9A9A9A]"}`}>
                   {emp.is_active ? "Active" : "Inactive"}
                 </span>
               </div>
 
-              <div className="mt-4 space-y-2">
-                {emp.phone && (
-                  <div className="flex items-center gap-2 text-xs text-[#6B6B6B]">
-                    <Phone className="h-3.5 w-3.5 text-[#ABABAB]" />
-                    {emp.phone}
-                  </div>
-                )}
-                {emp.nic && (
-                  <div className="flex items-center gap-2 text-xs text-[#6B6B6B]">
-                    <CreditCard className="h-3.5 w-3.5 text-[#ABABAB]" />
-                    {emp.nic}
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs text-[#6B6B6B]">
+              <div className="mt-4 space-y-2 text-xs text-[#6B6B6B]">
+                {emp.phone && <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-[#ABABAB]" />{emp.phone}</div>}
+                {emp.nic && <div className="flex items-center gap-2"><CreditCard className="h-3.5 w-3.5 text-[#ABABAB]" />{emp.nic}</div>}
+                <div className="flex items-center gap-2">
                   <Briefcase className="h-3.5 w-3.5 text-[#ABABAB]" />
-                  Basic: <span className="font-semibold text-[#0A0A0A]">Rs. {emp.basic_salary.toLocaleString()}</span>
+                  {emp.salary_type === "hourly" ? (
+                    <span>Rs. {Number(emp.hourly_rate || 0).toLocaleString()} / hr</span>
+                  ) : (
+                    <span>Rs. {Number(emp.basic_salary || 0).toLocaleString()} / month</span>
+                  )}
                 </div>
-                {emp.type === "worker" && emp.per_bike_commission > 0 && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
-                      <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                      Rs. {emp.per_bike_commission.toLocaleString()} / bike
-                    </span>
-                  </div>
+                {(emp.has_epf || emp.has_etf) && (
+                  <p className="text-[10px] text-[#9A9A9A]">
+                    {[emp.has_epf && "EPF", emp.has_etf && "ETF"].filter(Boolean).join(" + ")} deductions
+                  </p>
                 )}
-                {emp.employee_code && (
-                  <div className="flex items-center gap-2 text-xs text-[#6B6B6B]">
-                    <span className="text-[#ABABAB]">#</span>
-                    <span className="font-mono">{emp.employee_code}</span>
-                  </div>
+                {emp.type === "worker" && emp.per_bike_commission > 0 && (
+                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                    <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                    Rs. {emp.per_bike_commission.toLocaleString()} / bike
+                  </span>
                 )}
               </div>
 
               <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#F5F5F5]">
                 <button
-                  onClick={() => toggleStatus(emp.id, emp.is_active)}
-                  className={`flex-1 h-8 rounded-lg text-xs font-semibold transition-all ${emp.is_active ? "bg-[#F5F5F5] text-[#6B6B6B] hover:bg-red-50 hover:text-red-600" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+                  onClick={() => setModalEmployee(emp)}
+                  className="flex-1 h-8 rounded-lg text-xs font-semibold bg-[#F5F5F5] text-[#6B6B6B] hover:bg-[#FF4C00]/10 hover:text-[#FF4C00] flex items-center justify-center gap-1"
                 >
-                  {emp.is_active ? (
-                    <span className="flex items-center justify-center gap-1"><UserX className="h-3.5 w-3.5" /> Deactivate</span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-1"><UserCheck className="h-3.5 w-3.5" /> Activate</span>
-                  )}
+                  <Pencil className="h-3.5 w-3.5" /> Edit
                 </button>
                 <button
-                  onClick={() => deleteEmployee(emp.id, emp.full_name)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 hover:text-red-500 text-[#ABABAB] transition-all"
-                  title="Delete employee"
+                  onClick={() => toggleStatus(emp.id, emp.is_active)}
+                  className={`flex-1 h-8 rounded-lg text-xs font-semibold ${emp.is_active ? "bg-[#F5F5F5] text-[#6B6B6B] hover:bg-red-50 hover:text-red-600" : "bg-emerald-50 text-emerald-700"}`}
                 >
+                  {emp.is_active ? "Deactivate" : "Activate"}
+                </button>
+                <button onClick={() => deleteEmployee(emp.id, emp.full_name)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 hover:text-red-500 text-[#ABABAB]">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -243,134 +176,13 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {showAdd && (
-        <AddEmployeeModal
-          onClose={() => setShowAdd(false)}
-          onSuccess={() => { setShowAdd(false); loadEmployees(); }}
+      {modalEmployee !== undefined && (
+        <EmployeeFormModal
+          employee={modalEmployee}
+          onClose={() => setModalEmployee(undefined)}
+          onSuccess={() => { setModalEmployee(undefined); loadEmployees(); }}
         />
       )}
-    </div>
-  );
-}
-
-function AddEmployeeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState({
-    employee_code: "", full_name: "", phone: "", nic: "", email: "",
-    address: "", type: "worker", designation: "", department: "",
-    basic_salary: "", per_bike_commission: "",
-    join_date: new Date().toISOString().split("T")[0],
-  });
-  const [saving, setSaving] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    const supabase = createClient();
-    const { error } = await supabase.from("employees").insert({
-      ...form,
-      basic_salary: parseFloat(form.basic_salary) || 0,
-      per_bike_commission: form.type === "worker" ? (parseFloat(form.per_bike_commission) || 0) : 0,
-      employee_code: form.employee_code || null,
-    });
-    if (error) toast.error(error.message);
-    else { toast.success("Employee added"); onSuccess(); }
-    setSaving(false);
-  }
-
-  return (
-    <div className="r-modal-overlay">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="r-modal relative max-w-lg w-full">
-        <div className="r-modal-header">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#FF4C00]/10 flex items-center justify-center">
-              <User className="h-4 w-4 text-[#FF4C00]" />
-            </div>
-            <h3 className="text-[15px] font-bold text-[#0A0A0A] font-display">Add Employee</h3>
-          </div>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5]">
-            <X className="h-4 w-4 text-[#6B6B6B]" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="r-modal-body">
-          <div>
-            <label className="r-label">Employee Type</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(["worker", "director"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setForm({ ...form, type: t })}
-                  className={`h-9 rounded-xl border-2 text-[13px] font-semibold transition-all capitalize ${form.type === t ? "border-[#FF4C00] bg-[#FF4C00]/5 text-[#FF4C00]" : "border-[#E8E8E8] text-[#4A4A4A]"}`}
-                >
-                  {t === "director" && <Star className="h-3 w-3 inline mr-1 fill-current" />}
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="r-label">Full Name <span className="text-[#FF4C00]">*</span></label>
-              <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required placeholder="Employee full name" className="r-input" />
-            </div>
-            <div>
-              <label className="r-label">Employee Code</label>
-              <input value={form.employee_code} onChange={(e) => setForm({ ...form, employee_code: e.target.value })} placeholder="EMP001" className="r-input uppercase" />
-            </div>
-            <div>
-              <label className="r-label">Phone <span className="text-[#FF4C00]">*</span></label>
-              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="07X XXX XXXX" className="r-input" />
-            </div>
-            <div>
-              <label className="r-label">NIC</label>
-              <input value={form.nic} onChange={(e) => setForm({ ...form, nic: e.target.value })} placeholder="XXXXXXXXXX" className="r-input" />
-            </div>
-            <div>
-              <label className="r-label">Designation</label>
-              <input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} placeholder="e.g. Sales Executive" className="r-input" />
-            </div>
-            <div>
-              <label className="r-label">Department</label>
-              <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="e.g. Sales" className="r-input" />
-            </div>
-            <div>
-              <label className="r-label">Basic Salary (Rs.)</label>
-              <input type="number" value={form.basic_salary} onChange={(e) => setForm({ ...form, basic_salary: e.target.value })} placeholder="0" className="r-input" />
-            </div>
-            <div>
-              <label className="r-label">Join Date</label>
-              <input type="date" value={form.join_date} onChange={(e) => setForm({ ...form, join_date: e.target.value })} className="r-input" />
-            </div>
-            {form.type === "worker" && (
-              <div className="col-span-2">
-                <label className="r-label">
-                  Per Bike Commission (Rs.)
-                  <span className="ml-1.5 text-[10px] font-normal text-[#9A9A9A]">— Worker earns this per bike sold if present that day</span>
-                </label>
-                <input
-                  type="number"
-                  value={form.per_bike_commission}
-                  onChange={(e) => setForm({ ...form, per_bike_commission: e.target.value })}
-                  placeholder="e.g. 500"
-                  className="r-input"
-                />
-              </div>
-            )}
-            <div className="col-span-2">
-              <label className="r-label">Address</label>
-              <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" className="r-input" />
-            </div>
-          </div>
-        </form>
-        <div className="r-modal-footer">
-          <button type="button" onClick={onClose} className="r-btn-secondary">Cancel</button>
-          <button type="submit" form="emp-form" disabled={saving} onClick={handleSubmit as unknown as React.MouseEventHandler} className="r-btn-primary disabled:opacity-60">
-            {saving ? "Saving..." : "Add Employee"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
