@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import {
   LayoutDashboard, ShoppingCart, Package, Users, UserCog,
-  Landmark, BarChart3, Settings, Bell, ChevronDown,
+  Landmark, BarChart3, Settings, Bell, ChevronDown, TrendingUp,
   Bike, Car, Wrench, Puzzle, Receipt, FileText,
   UserCheck, Calendar, ClipboardList, DollarSign,
   CreditCard, Hash, Wallet, LogOut, FolderOpen, Search, X,
@@ -30,7 +30,7 @@ const NAV: NavItem[] = [
     { label: "Invoices",      href: "/sales/invoices", icon: FileText },
   ]},
   { label: "Customers", href: "/customers", icon: Users },
-  { label: "Commissions", href: "/commissions", icon: Receipt },
+  { label: "Income", href: "/income", icon: TrendingUp },
   { label: "HR", icon: UserCog, children: [
     { label: "Employees", href: "/hr/employees", icon: UserCheck },
     { label: "Attendance", href: "/hr/attendance", icon: Calendar },
@@ -40,6 +40,7 @@ const NAV: NavItem[] = [
   ]},
   { label: "Finance", icon: Landmark, children: [
     { label: "Overview",             href: "/finance",       icon: Landmark },
+    { label: "Income",               href: "/income",        icon: TrendingUp },
     { label: "TVS Cheques",          href: "/cheques/tvs",   icon: CreditCard },
     { label: "Other Cheques",        href: "/cheques/other", icon: Wallet },
     { label: "CR & Plates",          href: "/cr-plates",     icon: Hash },

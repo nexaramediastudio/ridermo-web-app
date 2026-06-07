@@ -119,7 +119,7 @@ export async function markCommissionReceived(
     .eq("sale_id", record.sale_id)
     .eq("status", "pending");
 
-  if (!pending?.length) {
+  if (!pending?.length && record.sale_id) {
     await supabase
       .from("worker_commissions")
       .update({ status: "received", received_at: now })
@@ -147,11 +147,49 @@ export async function markCommissionPending(
     .eq("id", recordId);
   if (updateErr) throw updateErr;
 
-  await supabase
-    .from("worker_commissions")
-    .update({ status: "pending", received_at: null })
-    .eq("sale_id", record.sale_id);
+  if (record.sale_id) {
+    await supabase
+      .from("worker_commissions")
+      .update({ status: "pending", received_at: null })
+      .eq("sale_id", record.sale_id);
+  }
 }
+
+/** Standalone income (no sale) — e.g. misc other earnings */
+export async function createStandaloneIncome(
+  supabase: SupabaseClient,
+  input: {
+    category: CommissionCategory;
+    amount: number;
+    description: string;
+    income_date: string;
+    markReceived?: boolean;
+  },
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("commission_records").insert({
+    sale_id: null,
+    category: input.category,
+    amount: input.amount,
+    description: input.description.trim(),
+    income_date: input.income_date,
+    status: input.markReceived ? "received" : "pending",
+    received_at: input.markReceived ? now : null,
+  });
+  if (error) throw error;
+}
+
+export const INCOME_TAB_GROUPS = {
+  tvs: { label: "TVS Commission", categories: ["tvs"] as CommissionCategory[] },
+  finance: { label: "Finance Commission", categories: ["finance"] as CommissionCategory[] },
+  insurance: { label: "Insurance Commission", categories: ["insurance"] as CommissionCategory[] },
+  other: {
+    label: "Other Income",
+    categories: ["transport", "documentation", "other"] as CommissionCategory[],
+  },
+} as const;
+
+export type IncomeTab = keyof typeof INCOME_TAB_GROUPS;
 
 export const REVENUE_RECOGNITION_NOTE =
   "Revenue is recognized only when a commission is marked Received — not when a bike is sold.";
