@@ -23,7 +23,7 @@ const breadcrumbs: Record<string, { label: string; parent?: string; parentHref?:
   "/hr/payslips": { label: "Payslips", parent: "HR" },
   "/cheques/tvs": { label: "TVS Cheques", parent: "Cheques" },
   "/cheques/other": { label: "Other Cheques", parent: "Cheques" },
-  "/cr-plates": { label: "CR & Number Plates" },
+  "/cr-plates": { label: "CR & Plates", parent: "Customers", parentHref: "/customers" },
   "/expenses": { label: "Expenses" },
   "/reports": { label: "Reports" },
   "/documents": { label: "Documents" },

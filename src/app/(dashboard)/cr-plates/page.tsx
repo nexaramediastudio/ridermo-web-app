@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Hash, Search, CheckCircle2, Clock, FileCheck, AlertTriangle, Trash2 } from "lucide-react";
+import { CustomersSubnav } from "@/components/customers/customers-subnav";
 
 type TrackStatus = "pending" | "received" | "collected";
 
@@ -129,6 +130,8 @@ export default function CRPlatesPage() {
           )}
         </div>
       </div>
+
+      <CustomersSubnav />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

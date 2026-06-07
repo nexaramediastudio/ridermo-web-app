@@ -29,7 +29,10 @@ const NAV: NavItem[] = [
     { label: "Sales History", href: "/sales",          icon: Receipt },
     { label: "Invoices",      href: "/sales/invoices", icon: FileText },
   ]},
-  { label: "Customers", href: "/customers", icon: Users },
+  { label: "Customers", icon: Users, children: [
+    { label: "All Customers", href: "/customers", icon: Users },
+    { label: "CR & Plates",     href: "/cr-plates",  icon: Hash },
+  ]},
   { label: "Income", href: "/income", icon: TrendingUp },
   { label: "HR", icon: UserCog, children: [
     { label: "Employees", href: "/hr/employees", icon: UserCheck },
@@ -43,7 +46,6 @@ const NAV: NavItem[] = [
     { label: "Income",               href: "/income",        icon: TrendingUp },
     { label: "TVS Cheques",          href: "/cheques/tvs",   icon: CreditCard },
     { label: "Other Cheques",        href: "/cheques/other", icon: Wallet },
-    { label: "CR & Plates",          href: "/cr-plates",     icon: Hash },
     { label: "Expenses",             href: "/expenses",      icon: Wallet },
   ]},
   { label: "Reports",   href: "/reports",   icon: BarChart3 },

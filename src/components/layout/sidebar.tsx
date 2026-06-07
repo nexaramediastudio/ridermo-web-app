@@ -32,7 +32,13 @@ const navigation: NavItem[] = [
       { label: "Invoices", href: "/sales/invoices", icon: FileText },
     ],
   },
-  { label: "Customers", href: "/customers", icon: Users },
+  {
+    label: "Customers", icon: Users,
+    children: [
+      { label: "All Customers", href: "/customers", icon: Users },
+      { label: "CR & Plates", href: "/cr-plates", icon: Hash },
+    ],
+  },
   {
     label: "Inventory", icon: Package,
     children: [
@@ -60,7 +66,6 @@ const navigation: NavItem[] = [
       { label: "Other Cheques", href: "/cheques/other", icon: Wallet },
     ],
   },
-  { label: "CR & Plates", href: "/cr-plates", icon: Hash },
   { label: "Expenses", href: "/expenses", icon: Wallet },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Documents", href: "/documents", icon: FolderOpen },

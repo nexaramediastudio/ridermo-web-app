@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Plus, Search, X, Users, UserPlus, TrendingUp, Trash2, Phone, CreditCard, MapPin } from "lucide-react";
+import { CustomersSubnav } from "@/components/customers/customers-subnav";
 
 interface CustomerRow {
   id: string;
@@ -76,6 +77,8 @@ export default function CustomersPage() {
           <Plus className="h-4 w-4" /> Add Customer
         </button>
       </div>
+
+      <CustomersSubnav />
 
       {/* KPI row */}
       <div className="grid grid-cols-3 gap-4">
