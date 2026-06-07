@@ -166,7 +166,9 @@ export async function createStandaloneIncome(
     markReceived?: boolean;
   },
 ): Promise<void> {
-  const now = new Date().toISOString();
+  const receivedAt = input.markReceived
+    ? `${input.income_date}T12:00:00.000Z`
+    : null;
   const { error } = await supabase.from("commission_records").insert({
     sale_id: null,
     category: input.category,
@@ -174,7 +176,7 @@ export async function createStandaloneIncome(
     description: input.description.trim(),
     income_date: input.income_date,
     status: input.markReceived ? "received" : "pending",
-    received_at: input.markReceived ? now : null,
+    received_at: receivedAt,
   });
   if (error) throw error;
 }

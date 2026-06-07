@@ -350,7 +350,7 @@ function AddIncomeModal({
         income_date: form.income_date,
         markReceived: form.markReceived,
       });
-      toast.success("Income added");
+      toast.success(form.markReceived ? "Income added as Received" : "Income added — Not Received yet");
       onSuccess();
     } catch (err) {
       toast.error((err as Error).message || "Failed to add income");
@@ -401,10 +401,40 @@ function AddIncomeModal({
               <input type="date" value={form.income_date} onChange={(e) => setForm({ ...form, income_date: e.target.value })} className="r-input w-full" />
             </div>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.markReceived} onChange={(e) => setForm({ ...form, markReceived: e.target.checked })} className="w-4 h-4 rounded" />
-            <span className="text-sm text-[#4A4A4A]">Already received (count in revenue now)</span>
-          </label>
+          <div className="bg-[#F5F7FA] rounded-xl p-4 space-y-3">
+            <p className="text-[11px] font-bold text-[#6B6B6B] uppercase tracking-wide">Received?</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, markReceived: false })}
+                className={`h-10 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                  !form.markReceived
+                    ? "border-amber-400 bg-amber-50 text-amber-800"
+                    : "border-[#E8E8E8] text-[#6B6B6B] hover:bg-white"
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                Not Received
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, markReceived: true })}
+                className={`h-10 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                  form.markReceived
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                    : "border-[#E8E8E8] text-[#6B6B6B] hover:bg-white"
+                }`}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Received
+              </button>
+            </div>
+            <p className="text-[11px] text-[#9A9A9A] leading-relaxed">
+              {form.markReceived
+                ? "Money is in your account — this will count in revenue, dashboard, and reports."
+                : "Still waiting for payment — shows as pending until you mark it Received later."}
+            </p>
+          </div>
         </form>
         <div className="r-modal-footer">
           <button type="button" onClick={onClose} className="r-btn-secondary">Cancel</button>
