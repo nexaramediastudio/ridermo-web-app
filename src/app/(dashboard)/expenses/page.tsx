@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, Wallet, X, ChevronLeft, ChevronRight, Receipt, TrendingDown, Trash2 } from "lucide-react";
+import { Plus, Search, Wallet, X, ChevronLeft, ChevronRight, Receipt, TrendingDown, Trash2, Banknote, CreditCard } from "lucide-react";
 
-type ExpenseCategory = "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "ridermo_payment" | "other";
+type ExpenseCategory = "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "ridermo_payment" | "oil" | "other";
+type ExpensePaymentType = "cash" | "card";
 
 interface Expense {
   id: string;
@@ -13,6 +14,7 @@ interface Expense {
   description: string;
   amount: number;
   expense_date: string;
+  payment_type: ExpensePaymentType;
   notes?: string;
   created_at: string;
 }
@@ -25,7 +27,13 @@ const CATEGORY_CONFIG: Record<ExpenseCategory, { label: string; badge: string }>
   bonus:             { label: "Bonus",             badge: "r-badge-amber" },
   petty_cash:        { label: "Petty Cash",        badge: "r-badge-gray" },
   ridermo_payment:   { label: "Ridermo Payment",   badge: "r-badge-orange" },
+  oil:               { label: "Oil",               badge: "r-badge-amber" },
   other:             { label: "Other",             badge: "r-badge-gray" },
+};
+
+const PAYMENT_TYPE_CONFIG: Record<ExpensePaymentType, { label: string; badge: string }> = {
+  cash: { label: "Cash", badge: "r-badge-green" },
+  card: { label: "Card", badge: "r-badge-blue" },
 };
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -202,6 +210,7 @@ export default function ExpensesPage() {
             <tr className="r-thead-row">
               <th className="r-th">Date</th>
               <th className="r-th">Category</th>
+              <th className="r-th">Payment</th>
               <th className="r-th">Description</th>
               <th className="r-th">Notes</th>
               <th className="r-th text-right">Amount</th>
@@ -212,14 +221,14 @@ export default function ExpensesPage() {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-[#F5F5F5]">
-                  {Array.from({ length: 5 }).map((_, j) => (
+                  {Array.from({ length: 7 }).map((_, j) => (
                     <td key={j} className="r-td"><div className="h-4 bg-[#F0F0F0] rounded animate-pulse" /></td>
                   ))}
                 </tr>
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-16 text-center">
+                <td colSpan={7} className="px-5 py-16 text-center">
                   <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mx-auto mb-3">
                     <Wallet className="h-7 w-7 text-[#ABABAB]" />
                   </div>
@@ -232,6 +241,7 @@ export default function ExpensesPage() {
             ) : (
               filtered.map((exp) => {
                 const cfg = CATEGORY_CONFIG[exp.category];
+                const payCfg = PAYMENT_TYPE_CONFIG[exp.payment_type || "cash"];
                 return (
                   <tr key={exp.id} className="r-tr group">
                     <td className="r-td">
@@ -241,6 +251,9 @@ export default function ExpensesPage() {
                     </td>
                     <td className="r-td">
                       <span className={`${cfg.badge} text-[10px]`}>{cfg.label}</span>
+                    </td>
+                    <td className="r-td">
+                      <span className={`${payCfg.badge} text-[10px]`}>{payCfg.label}</span>
                     </td>
                     <td className="r-td">
                       <span className="text-[13px] text-[#0A0A0A] font-medium">{exp.description}</span>
@@ -292,6 +305,7 @@ export default function ExpensesPage() {
 function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [form, setForm] = useState({
     category: "petty_cash",
+    payment_type: "cash" as ExpensePaymentType,
     description: "",
     amount: "",
     expense_date: new Date().toISOString().split("T")[0],
@@ -365,6 +379,28 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 onChange={(e) => setForm({ ...form, expense_date: e.target.value })}
                 className="r-input"
               />
+            </div>
+          </div>
+          <div>
+            <label className="r-label">Payment Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["cash", "card"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setForm({ ...form, payment_type: type })}
+                  className={`h-10 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                    form.payment_type === type
+                      ? type === "cash"
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                        : "border-blue-500 bg-blue-50 text-blue-800"
+                      : "border-[#E8E8E8] text-[#6B6B6B] hover:bg-white"
+                  }`}
+                >
+                  {type === "cash" ? <Banknote className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                  {type === "cash" ? "Cash" : "Card"}
+                </button>
+              ))}
             </div>
           </div>
           <div>

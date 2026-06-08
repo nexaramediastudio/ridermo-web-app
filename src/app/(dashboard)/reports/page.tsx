@@ -37,6 +37,7 @@ interface SaleRow {
 }
 interface ExpenseRow {
   id: string; category: string; description: string; amount: number; expense_date: string;
+  payment_type?: string;
 }
 interface InventoryRow {
   model: string; available: number; sold: number; reserved: number;
@@ -53,6 +54,7 @@ const EXP_CATS: Record<string, string> = {
   salary:"bg-emerald-50 text-emerald-700", broker_commission:"bg-orange-50 text-orange-700",
   bonus:"bg-amber-50 text-amber-700", petty_cash:"bg-slate-100 text-slate-700",
   ridermo_payment:"bg-[#FF4C00]/10 text-[#FF4C00]",
+  oil:"bg-amber-50 text-amber-800",
   other:"bg-gray-100 text-gray-700",
 };
 const PAY_STYLES: Record<string, string> = {
@@ -137,7 +139,7 @@ export default function ReportsPage() {
         .eq("status", "completed").gte("sale_date", viewMode === "yearly" ? yearStart : start).lt("sale_date", viewMode === "yearly" ? yearEnd : end)
         .order("sale_date", { ascending: false }),
       supabase.from("expenses")
-        .select("id, category, description, amount, expense_date")
+        .select("id, category, description, amount, expense_date, payment_type")
         .gte("expense_date", viewMode === "yearly" ? yearStart : start).lt("expense_date", viewMode === "yearly" ? yearEnd : end)
         .order("expense_date", { ascending: false }),
       supabase.from("inventory_bikes").select("status, purchase_price, bike_models(name)"),
@@ -323,7 +325,7 @@ export default function ReportsPage() {
           <button
             onClick={() => {
               if (tab === "sales") exportCSV(salesRows.map(r => ({ Invoice: r.invoice_number, Date: r.sale_date, Customer: r.customer, Bike: r.bike, Payment: r.payment_type, "Vehicle Value": r.total_amount, "Received Income": r.received_income, Pending: r.pending_income, "TVS Comm": r.tvs_commission, "Finance Comm": r.finance_commission, "Insurance Comm": r.insurance_commission })), `sales-${periodLabel}.csv`);
-              else if (tab === "expenses") exportCSV(expenseRows.map(r => ({ Date: r.expense_date, Category: r.category, Description: r.description, Amount: r.amount })), `expenses-${periodLabel}.csv`);
+              else if (tab === "expenses") exportCSV(expenseRows.map(r => ({ Date: r.expense_date, Category: r.category, "Payment Type": r.payment_type || "cash", Description: r.description, Amount: r.amount })), `expenses-${periodLabel}.csv`);
               else if (tab === "pl") exportCSV(monthly.map(m => ({ Month: m.month, Sales: m.sales_count, "Received Income": m.revenue, Expenses: m.expenses, Profit: m.profit, "Margin%": m.margin.toFixed(1) })), `pl-${year}.csv`);
               else if (tab === "inventory") exportCSV(inventoryRows.map(r => ({ Model: r.model, Available: r.available, Sold: r.sold, Reserved: r.reserved, Total: r.total, "Stock Value": r.stockValue })), `inventory-${periodLabel}.csv`);
             }}
@@ -769,7 +771,7 @@ export default function ReportsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[#F5F5F5]">
-                    {["Date","Category","Description","Amount"].map(h => (
+                    {["Date","Category","Payment","Description","Amount"].map(h => (
                       <th key={h} className="text-left px-5 py-3 text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -779,12 +781,13 @@ export default function ReportsPage() {
                     <tr key={e.id} className="border-b border-[#F8F8F8] hover:bg-[#FAFAFA]">
                       <td className="px-5 py-3"><span className="text-xs text-[#6B6B6B]">{new Date(e.expense_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</span></td>
                       <td className="px-5 py-3"><span className={`text-[10px] font-bold px-2 py-1 rounded-full capitalize ${EXP_CATS[e.category]||"bg-gray-100 text-gray-700"}`}>{e.category.replace("_"," ")}</span></td>
+                      <td className="px-5 py-3"><span className={`text-[10px] font-bold px-2 py-1 rounded-full capitalize ${(e.payment_type || "cash") === "card" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}>{e.payment_type || "cash"}</span></td>
                       <td className="px-5 py-3"><span className="text-sm text-[#0A0A0A]">{e.description}</span></td>
                       <td className="px-5 py-3"><span className="text-sm font-bold text-[#0A0A0A]">{fmt(e.amount)}</span></td>
                     </tr>
                   ))}
                   <tr className="bg-[#FAFAFA] border-t-2 border-[#EFEFEF]">
-                    <td colSpan={3} className="px-5 py-3"><span className="text-sm font-bold text-[#0A0A0A]">Total</span></td>
+                    <td colSpan={4} className="px-5 py-3"><span className="text-sm font-bold text-[#0A0A0A]">Total</span></td>
                     <td className="px-5 py-3"><span className="text-sm font-bold text-[#FF4C00]">{fmt(totalExp)}</span></td>
                   </tr>
                 </tbody>

@@ -322,30 +322,31 @@ function ChequesEmbed({ type }: { type: "tvs" | "other" }) {
 
 // ── Mini expenses embed ──
 function ExpensesEmbed() {
-  const [data, setData] = useState<{ id: string; category: string; description: string; amount: number; expense_date: string }[]>([]);
+  const [data, setData] = useState<{ id: string; category: string; description: string; amount: number; expense_date: string; payment_type?: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
     const now = new Date();
     const start = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-01`;
-    supabase.from("expenses").select("id, category, description, amount, expense_date").gte("expense_date", start).order("expense_date", { ascending: false }).limit(20)
+    supabase.from("expenses").select("id, category, description, amount, expense_date, payment_type").gte("expense_date", start).order("expense_date", { ascending: false }).limit(20)
       .then(({ data: d }) => { setData(d || []); setLoading(false); });
   }, []);
 
-  const CAT_COLORS: Record<string, string> = { rent:"bg-purple-50 text-purple-700", utilities:"bg-blue-50 text-blue-700", salary:"bg-emerald-50 text-emerald-700", broker_commission:"bg-orange-50 text-orange-700", bonus:"bg-amber-50 text-amber-700", petty_cash:"bg-gray-100 text-gray-700", ridermo_payment:"bg-[#FF4C00]/10 text-[#FF4C00]", other:"bg-slate-50 text-slate-700" };
+  const CAT_COLORS: Record<string, string> = { rent:"bg-purple-50 text-purple-700", utilities:"bg-blue-50 text-blue-700", salary:"bg-emerald-50 text-emerald-700", broker_commission:"bg-orange-50 text-orange-700", bonus:"bg-amber-50 text-amber-700", petty_cash:"bg-gray-100 text-gray-700", ridermo_payment:"bg-[#FF4C00]/10 text-[#FF4C00]", oil:"bg-amber-50 text-amber-800", other:"bg-slate-50 text-slate-700" };
 
   return (
     <div className="bg-white rounded-2xl border border-[#EFEFEF] overflow-hidden">
       <table className="w-full">
-        <thead><tr className="border-b border-[#F0F0F0]">{["Date","Category","Description","Amount"].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">{h}</th>)}</tr></thead>
+        <thead><tr className="border-b border-[#F0F0F0]">{["Date","Category","Payment","Description","Amount"].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">{h}</th>)}</tr></thead>
         <tbody>
-          {loading ? Array.from({length:3}).map((_,i) => <tr key={i} className="border-b border-[#F8F8F8]">{Array.from({length:4}).map((_,j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-[#F0F0F0] rounded animate-pulse" /></td>)}</tr>) :
-          data.length === 0 ? <tr><td colSpan={4} className="px-5 py-10 text-center text-sm text-[#ABABAB]">No expenses this month</td></tr> :
+          {loading ? Array.from({length:3}).map((_,i) => <tr key={i} className="border-b border-[#F8F8F8]">{Array.from({length:5}).map((_,j) => <td key={j} className="px-5 py-4"><div className="h-4 bg-[#F0F0F0] rounded animate-pulse" /></td>)}</tr>) :
+          data.length === 0 ? <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-[#ABABAB]">No expenses this month</td></tr> :
           data.map(e => (
             <tr key={e.id} className="border-b border-[#F8F8F8] hover:bg-[#FAFAFA]">
               <td className="px-5 py-3"><span className="text-sm text-[#6B6B6B]">{new Date(e.expense_date).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</span></td>
               <td className="px-5 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CAT_COLORS[e.category]||"bg-[#F5F5F5] text-[#6B6B6B]"}`}>{e.category.replace("_"," ")}</span></td>
+              <td className="px-5 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${(e.payment_type || "cash") === "card" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}>{e.payment_type || "cash"}</span></td>
               <td className="px-5 py-3"><span className="text-sm text-[#0A0A0A]">{e.description}</span></td>
               <td className="px-5 py-3"><span className="text-sm font-bold text-[#0A0A0A]">Rs. {e.amount.toLocaleString()}</span></td>
             </tr>
