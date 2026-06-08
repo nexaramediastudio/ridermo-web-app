@@ -127,9 +127,11 @@ export interface Cheque {
   notes?: string;
 }
 
+import type { ExpenseCategory } from "@/lib/finance/expense-categories";
+
 export interface Expense {
   id: string;
-  category: "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "ridermo_payment" | "oil" | "other";
+  category: ExpenseCategory;
   description: string;
   amount: number;
   expense_date: string;

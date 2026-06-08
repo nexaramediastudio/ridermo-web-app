@@ -14,6 +14,7 @@ import {
   sumReceivedByCategory,
   type CommissionCategory,
 } from "@/lib/finance/commission-records";
+import { expenseCategoryColor, expenseCategoryLabel } from "@/lib/finance/expense-categories";
 import { CommissionsPanel } from "@/components/finance/commissions-panel";
 
 type FinanceTab = "overview" | "commissions" | "tvs_cheques" | "other_cheques" | "expenses";
@@ -333,8 +334,6 @@ function ExpensesEmbed() {
       .then(({ data: d }) => { setData(d || []); setLoading(false); });
   }, []);
 
-  const CAT_COLORS: Record<string, string> = { rent:"bg-purple-50 text-purple-700", utilities:"bg-blue-50 text-blue-700", salary:"bg-emerald-50 text-emerald-700", broker_commission:"bg-orange-50 text-orange-700", bonus:"bg-amber-50 text-amber-700", petty_cash:"bg-gray-100 text-gray-700", ridermo_payment:"bg-[#FF4C00]/10 text-[#FF4C00]", oil:"bg-amber-50 text-amber-800", other:"bg-slate-50 text-slate-700" };
-
   return (
     <div className="bg-white rounded-2xl border border-[#EFEFEF] overflow-hidden">
       <table className="w-full">
@@ -345,7 +344,7 @@ function ExpensesEmbed() {
           data.map(e => (
             <tr key={e.id} className="border-b border-[#F8F8F8] hover:bg-[#FAFAFA]">
               <td className="px-5 py-3"><span className="text-sm text-[#6B6B6B]">{new Date(e.expense_date).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</span></td>
-              <td className="px-5 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CAT_COLORS[e.category]||"bg-[#F5F5F5] text-[#6B6B6B]"}`}>{e.category.replace("_"," ")}</span></td>
+              <td className="px-5 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${expenseCategoryColor(e.category)}`}>{expenseCategoryLabel(e.category)}</span></td>
               <td className="px-5 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${(e.payment_type || "cash") === "card" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}>{e.payment_type || "cash"}</span></td>
               <td className="px-5 py-3"><span className="text-sm text-[#0A0A0A]">{e.description}</span></td>
               <td className="px-5 py-3"><span className="text-sm font-bold text-[#0A0A0A]">Rs. {e.amount.toLocaleString()}</span></td>

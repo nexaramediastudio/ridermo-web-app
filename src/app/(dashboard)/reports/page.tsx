@@ -18,6 +18,7 @@ import {
   type CommissionCategory,
 } from "@/lib/finance/commission-records";
 import { calcPotentialIncome } from "@/lib/finance/commission-records";
+import { expenseCategoryColor, expenseCategoryLabel } from "@/lib/finance/expense-categories";
 
 // ─── Types ───────────────────────────────────────────────────────
 type ReportTab = "pl" | "sales" | "commission" | "expenses" | "inventory";
@@ -49,14 +50,6 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const fmt = (n: number) => `Rs. ${n.toLocaleString("en", { maximumFractionDigits: 0 })}`;
 const fmtK = (n: number) => n >= 1_000_000 ? `${(n/1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n/1_000).toFixed(0)}K` : `${n}`;
 
-const EXP_CATS: Record<string, string> = {
-  rent:"bg-purple-50 text-purple-700", utilities:"bg-blue-50 text-blue-700",
-  salary:"bg-emerald-50 text-emerald-700", broker_commission:"bg-orange-50 text-orange-700",
-  bonus:"bg-amber-50 text-amber-700", petty_cash:"bg-slate-100 text-slate-700",
-  ridermo_payment:"bg-[#FF4C00]/10 text-[#FF4C00]",
-  oil:"bg-amber-50 text-amber-800",
-  other:"bg-gray-100 text-gray-700",
-};
 const PAY_STYLES: Record<string, string> = {
   cash:"bg-emerald-50 text-emerald-700",
   finance:"bg-blue-50 text-blue-700",
@@ -262,7 +255,7 @@ export default function ReportsPage() {
   // Expense by category
   const expByCat: Record<string, number> = {};
   for (const e of expenseRows) expByCat[e.category] = (expByCat[e.category] || 0) + e.amount;
-  const expCatData = Object.entries(expByCat).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  const expCatData = Object.entries(expByCat).map(([name, value]) => ({ name: expenseCategoryLabel(name), value })).sort((a, b) => b.value - a.value);
   const PIE_COLORS = ["#FF4C00", "#3B82F6", "#8B5CF6", "#10B981", "#F59E0B", "#EC4899", "#14B8A6"];
 
   const periodLabel = viewMode === "yearly" ? `${year}` : `${MONTHS[selectedMonth]} ${year}`;
@@ -780,7 +773,7 @@ export default function ReportsPage() {
                   {expenseRows.map(e => (
                     <tr key={e.id} className="border-b border-[#F8F8F8] hover:bg-[#FAFAFA]">
                       <td className="px-5 py-3"><span className="text-xs text-[#6B6B6B]">{new Date(e.expense_date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</span></td>
-                      <td className="px-5 py-3"><span className={`text-[10px] font-bold px-2 py-1 rounded-full capitalize ${EXP_CATS[e.category]||"bg-gray-100 text-gray-700"}`}>{e.category.replace("_"," ")}</span></td>
+                      <td className="px-5 py-3"><span className={`text-[10px] font-bold px-2 py-1 rounded-full ${expenseCategoryColor(e.category)}`}>{expenseCategoryLabel(e.category)}</span></td>
                       <td className="px-5 py-3"><span className={`text-[10px] font-bold px-2 py-1 rounded-full capitalize ${(e.payment_type || "cash") === "card" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}>{e.payment_type || "cash"}</span></td>
                       <td className="px-5 py-3"><span className="text-sm text-[#0A0A0A]">{e.description}</span></td>
                       <td className="px-5 py-3"><span className="text-sm font-bold text-[#0A0A0A]">{fmt(e.amount)}</span></td>

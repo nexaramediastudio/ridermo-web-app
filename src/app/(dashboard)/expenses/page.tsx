@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Plus, Search, Wallet, X, ChevronLeft, ChevronRight, Receipt, TrendingDown, Trash2, Banknote, CreditCard } from "lucide-react";
+import { EXPENSE_CATEGORY_CONFIG, type ExpenseCategory } from "@/lib/finance/expense-categories";
 
-type ExpenseCategory = "rent" | "utilities" | "salary" | "broker_commission" | "bonus" | "petty_cash" | "ridermo_payment" | "oil" | "other";
 type ExpensePaymentType = "cash" | "card";
 
 interface Expense {
@@ -19,17 +19,7 @@ interface Expense {
   created_at: string;
 }
 
-const CATEGORY_CONFIG: Record<ExpenseCategory, { label: string; badge: string }> = {
-  rent:              { label: "Rent",              badge: "r-badge-purple" },
-  utilities:         { label: "Utilities",         badge: "r-badge-blue" },
-  salary:            { label: "Salary",            badge: "r-badge-green" },
-  broker_commission: { label: "Broker Commission", badge: "r-badge-orange" },
-  bonus:             { label: "Bonus",             badge: "r-badge-amber" },
-  petty_cash:        { label: "Petty Cash",        badge: "r-badge-gray" },
-  ridermo_payment:   { label: "Ridermo Payment",   badge: "r-badge-orange" },
-  oil:               { label: "Oil",               badge: "r-badge-amber" },
-  other:             { label: "Other",             badge: "r-badge-gray" },
-};
+const CATEGORY_CONFIG = EXPENSE_CATEGORY_CONFIG;
 
 const PAYMENT_TYPE_CONFIG: Record<ExpensePaymentType, { label: string; badge: string }> = {
   cash: { label: "Cash", badge: "r-badge-green" },
