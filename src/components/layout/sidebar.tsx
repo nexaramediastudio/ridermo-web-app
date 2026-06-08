@@ -14,6 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { AppLogo } from "@/components/branding/app-logo";
 
 interface NavItem {
   label: string;
@@ -148,22 +149,7 @@ export function Sidebar() {
     <aside className="w-[220px] flex-shrink-0 h-screen flex flex-col bg-[#0C0C0C] border-r border-white/6">
       {/* Logo */}
       <div className="h-14 flex items-center px-4 border-b border-white/6 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[#FF4C00] flex items-center justify-center flex-shrink-0">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" fill="white" fillOpacity="0.9" />
-              <path d="M12 2L3 7l9 5 9-5-9-5z" fill="white" />
-            </svg>
-          </div>
-          <div>
-            <span className="text-[13px] font-bold tracking-tight text-white leading-none" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-              RIDERMO
-            </span>
-            <p className="text-[9px] text-[#555] leading-tight font-semibold uppercase tracking-widest mt-0.5">
-              Dealership ERP
-            </p>
-          </div>
-        </div>
+        <AppLogo variant="sidebar" />
       </div>
 
       {/* Navigation */}

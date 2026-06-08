@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { AppLogo } from "@/components/branding/app-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,22 +33,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-4">
       <div className="w-full max-w-[420px]">
         {/* Logo */}
-        <div className="mb-12 text-center">
-          <div className="inline-flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-[#FF4C00] flex items-center justify-center">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" fill="white" fillOpacity="0.9"/>
-                <path d="M12 2L3 7l9 5 9-5-9-5z" fill="white"/>
-              </svg>
-            </div>
-            <span
-              className="text-2xl font-bold tracking-tight text-[#0A0A0A]"
-              style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-            >
-              RIDERMO
-            </span>
-          </div>
-          <p className="text-sm text-[#6B6B6B] mt-1">Dealership Operating System</p>
+        <div className="mb-12 text-center flex flex-col items-center">
+          <AppLogo variant="login" className="justify-center items-center" />
         </div>
 
         {/* Card */}

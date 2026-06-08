@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { AppProviders } from "@/components/providers/app-providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -34,7 +35,9 @@ export default function RootLayout({
         className={`${inter.variable} ${plusJakarta.variable} antialiased`}
         style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
       >
-        {children}
+        <AppProviders>
+          {children}
+        </AppProviders>
         <Toaster
           position="top-right"
           toastOptions={{

@@ -7,8 +7,15 @@ import {
   Building2, Shield, Users, Settings2, Bike,
   Plus, X, Edit2, Check, Save, Trash2, Search,
   Phone, Mail, MapPin, Globe, Key,
-  Zap, Fuel, ChevronDown, ChevronUp, Palette,
+  Zap, Fuel, ChevronDown, ChevronUp, Palette, Upload, ImageIcon,
 } from "lucide-react";
+import { useCompanySettings } from "@/components/providers/company-settings-provider";
+import {
+  saveCompanySettings,
+  uploadCompanyLogo,
+  removeCompanyLogo,
+  type CompanySettings as CompanySettingsData,
+} from "@/lib/company-settings";
 
 type Tab = "company" | "bikes" | "finance" | "insurance" | "users" | "security";
 
@@ -23,56 +30,171 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 // ─── Company Settings ─────────────────────────────────────────────────────────
 function CompanySettings() {
+  const { settings, setSettings, refresh } = useCompanySettings();
   const [form, setForm] = useState({
-    name: "RIDERMO",
-    tagline: "Premium TVS Dealership",
-    phone: "",
-    email: "",
-    address: "",
-    city: "",
-    website: "",
-    reg_number: "",
-    tax_number: "",
+    company_name: settings.company_name,
+    tagline: settings.tagline || "",
+    phone: settings.phone || "",
+    email: settings.email || "",
+    address: settings.address || "",
+    city: settings.city || "",
+    website: settings.website || "",
+    reg_number: settings.reg_number || "",
+    tax_number: settings.tax_number || "",
   });
+  const [logoUrl, setLogoUrl] = useState<string | null>(settings.logo_url);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  function handleSave() {
+  useEffect(() => {
+    setForm({
+      company_name: settings.company_name,
+      tagline: settings.tagline || "",
+      phone: settings.phone || "",
+      email: settings.email || "",
+      address: settings.address || "",
+      city: settings.city || "",
+      website: settings.website || "",
+      reg_number: settings.reg_number || "",
+      tax_number: settings.tax_number || "",
+    });
+    setLogoUrl(settings.logo_url);
+  }, [settings]);
+
+  async function handleSave() {
     setSaving(true);
-    setTimeout(() => {
+    const payload: Omit<CompanySettingsData, "id" | "updated_at"> = {
+      company_name: form.company_name.trim() || "RIDERMO",
+      tagline: form.tagline.trim() || null,
+      logo_url: logoUrl,
+      phone: form.phone.trim() || null,
+      email: form.email.trim() || null,
+      address: form.address.trim() || null,
+      city: form.city.trim() || null,
+      website: form.website.trim() || null,
+      reg_number: form.reg_number.trim() || null,
+      tax_number: form.tax_number.trim() || null,
+    };
+    const { error } = await saveCompanySettings(payload);
+    if (error) toast.error(error);
+    else {
       toast.success("Company settings saved");
-      setSaving(false);
-    }, 800);
+      setSettings({ id: "default", ...payload });
+      await refresh();
+    }
+    setSaving(false);
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const { url, error } = await uploadCompanyLogo(file);
+    if (error || !url) {
+      toast.error(error || "Upload failed");
+      setUploading(false);
+      e.target.value = "";
+      return;
+    }
+    setLogoUrl(url);
+    const payload: Omit<CompanySettingsData, "id" | "updated_at"> = {
+      company_name: form.company_name.trim() || "RIDERMO",
+      tagline: form.tagline.trim() || null,
+      logo_url: url,
+      phone: form.phone.trim() || null,
+      email: form.email.trim() || null,
+      address: form.address.trim() || null,
+      city: form.city.trim() || null,
+      website: form.website.trim() || null,
+      reg_number: form.reg_number.trim() || null,
+      tax_number: form.tax_number.trim() || null,
+    };
+    const { error: saveError } = await saveCompanySettings(payload);
+    if (saveError) toast.error(saveError);
+    else {
+      toast.success("Logo uploaded");
+      setSettings({ id: "default", ...payload });
+      await refresh();
+    }
+    setUploading(false);
+    e.target.value = "";
+  }
+
+  async function handleRemoveLogo() {
+    if (!window.confirm("Remove the custom logo and use the default?")) return;
+    setUploading(true);
+    const { error } = await removeCompanyLogo(logoUrl);
+    if (error) toast.error(error);
+    else {
+      setLogoUrl(null);
+      toast.success("Logo removed");
+      await refresh();
+    }
+    setUploading(false);
   }
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h3 className="text-base font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Company Information</h3>
-        <p className="text-sm text-[#9A9A9A] mt-0.5">This information appears on invoices and documents</p>
+        <p className="text-sm text-[#9A9A9A] mt-0.5">This information appears on invoices, the login page, and the app header</p>
       </div>
 
-      {/* Logo placeholder */}
-      <div className="flex items-center gap-4">
-        <div className="w-20 h-20 rounded-2xl bg-[#FF4C00]/10 border-2 border-dashed border-[#FF4C00]/30 flex flex-col items-center justify-center cursor-pointer hover:bg-[#FF4C00]/15 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-[#FF4C00] flex items-center justify-center mb-1">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" fill="white" fillOpacity="0.9"/>
-              <path d="M12 2L3 7l9 5 9-5-9-5z" fill="white"/>
-            </svg>
+      <div className="flex items-start gap-4">
+        <label
+          htmlFor="company-logo-upload"
+          className="w-24 h-24 rounded-2xl bg-[#F5F7FA] border-2 border-dashed border-[#E8E8E8] flex items-center justify-center cursor-pointer hover:border-[#FF4C00]/40 hover:bg-[#FF4C00]/5 transition-all overflow-hidden flex-shrink-0"
+        >
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="Company logo" className="w-full h-full object-contain p-2" />
+          ) : (
+            <div className="flex flex-col items-center gap-1 text-[#ABABAB]">
+              <ImageIcon className="h-6 w-6" />
+              <span className="text-[10px] font-semibold">No logo</span>
+            </div>
+          )}
+        </label>
+        <input
+          id="company-logo-upload"
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+          className="hidden"
+          onChange={handleLogoUpload}
+          disabled={uploading}
+        />
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-[#0A0A0A]">App Logo</p>
+          <p className="text-xs text-[#9A9A9A] leading-relaxed">
+            Upload your logo for the top navigation, login screen, and sidebar.
+            PNG, JPG, WebP, or SVG — max 2MB. Recommended 200×200px or wider for wordmarks.
+          </p>
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="company-logo-upload"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[#FF4C00]/10 text-[#FF4C00] text-xs font-semibold cursor-pointer hover:bg-[#FF4C00]/15 transition-colors"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              {uploading ? "Uploading..." : "Upload logo"}
+            </label>
+            {logoUrl && (
+              <button
+                type="button"
+                onClick={handleRemoveLogo}
+                disabled={uploading}
+                className="h-8 px-3 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                Remove
+              </button>
+            )}
           </div>
-          <span className="text-[10px] text-[#FF4C00] font-semibold">Logo</span>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-[#0A0A0A]">Company Logo</p>
-          <p className="text-xs text-[#9A9A9A] mt-0.5">PNG or SVG, recommended 200×200px</p>
-          <button className="mt-2 text-xs text-[#FF4C00] font-semibold hover:underline">Upload logo</button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2 space-y-1.5">
           <label className="text-sm font-medium text-[#1A1A1A]">Company Name</label>
-          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] font-semibold" />
+          <input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] font-semibold" />
         </div>
         <div className="col-span-2 space-y-1.5">
           <label className="text-sm font-medium text-[#1A1A1A]">Tagline</label>

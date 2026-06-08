@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { AppLogo } from "@/components/branding/app-logo";
 
 interface NavChild { label: string; href: string; icon: React.ElementType; }
 interface NavItem  { label: string; href?: string; icon: React.ElementType; children?: NavChild[]; }
@@ -145,17 +146,7 @@ export function TopNav() {
   return (
     <header className="h-14 bg-white border-b border-[#EBEBEB] flex items-center px-6 flex-shrink-0 sticky top-0" style={{ zIndex: 1000 }}>
       {/* Logo — left */}
-      <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0 w-36">
-        <div className="w-7 h-7 rounded-lg bg-[#FF4C00] flex items-center justify-center">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" fill="white" fillOpacity="0.9" />
-            <path d="M12 2L3 7l9 5 9-5-9-5z" fill="white" />
-          </svg>
-        </div>
-        <span className="text-[14px] font-extrabold tracking-tight text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-          RIDERMO
-        </span>
-      </Link>
+      <AppLogo variant="nav" href="/dashboard" className="w-36" />
 
       {/* Nav items — truly centered */}
       <nav className="flex-1 flex items-center justify-center gap-0.5">
