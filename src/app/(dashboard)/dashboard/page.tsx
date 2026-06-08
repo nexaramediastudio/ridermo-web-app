@@ -17,7 +17,7 @@ import { sumReceivedByCategory, type CommissionCategory } from "@/lib/finance/co
 // ─── Types ────────────────────────────────────────────────────────
 interface DashData {
   todaySales: number; todayCount: number;
-  monthRevenue: number; monthCount: number;
+  monthRevenue: number; monthCount: number; prevMonthCount: number;
   monthExpenses: number; stockValue: number;
   pendingCR: number; pendingPlates: number;
   pendingCheques: number; pendingChequeAmount: number;
@@ -29,7 +29,9 @@ interface DashData {
   revenueSeries: { label: string; revenue: number; expenses: number; profit: number }[];
   monthlySales: { month: string; sales: number }[];
   salesDist: { name: string; value: number; color: string }[];
-  reminders: { id: string; type: string; label: string; date: string; amount?: number }[];
+  reminders: { id: string; type: string; label: string; date: string; amount?: number; href: string }[];
+  pendingIncome: number;
+  pendingIncomeCount: number;
   userName: string;
 }
 
@@ -104,31 +106,50 @@ export default function DashboardPage() {
 
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().split("T")[0];
 
-    const [todaySalesR, monthSalesCountR, todayCommR, monthCommR, prevCommR, histCommR, expR, invR, crR, plR, chqR, attR, recentR, profR] = await Promise.all([
+    const [todaySalesR, monthSalesCountR, prevMonthSalesR, todayCommR, monthCommR, prevCommR, histCommR, pendingCommR, expR, invR, crR, plR, chqR, attR, empCountR, recentR, authR] = await Promise.all([
       supabase.from("sales").select("id").eq("status", "completed").gte("sale_date", today).lt("sale_date", tomorrowStr),
       supabase.from("sales").select("id").eq("status", "completed").gte("sale_date", startOfMonth).lt("sale_date", nextMonthStart),
-      supabase.from("commission_records").select("amount, category, received_at").eq("status", "received").gte("received_at", today).lt("received_at", tomorrowStr),
-      supabase.from("commission_records").select("amount, category, received_at, sale_id, sales(payment_type)").eq("status", "received").gte("received_at", startOfMonth),
-      supabase.from("commission_records").select("amount, category").eq("status", "received").gte("received_at", startPrev).lt("received_at", endPrev),
-      supabase.from("commission_records").select("amount, received_at").eq("status", "received").gte("received_at", sixMonthsAgo),
-      supabase.from("expenses").select("amount, expense_date").gte("expense_date", startOfMonth),
+      supabase.from("sales").select("id").eq("status", "completed").gte("sale_date", startPrev).lt("sale_date", endPrev),
+      supabase.from("commission_records").select("amount, category, received_at").eq("status", "received").gte("received_at", `${today}T00:00:00`).lt("received_at", `${tomorrowStr}T00:00:00`),
+      supabase.from("commission_records").select("amount, category, received_at, sale_id").eq("status", "received").gte("received_at", `${startOfMonth}T00:00:00`).lt("received_at", `${nextMonthStart}T00:00:00`),
+      supabase.from("commission_records").select("amount, category").eq("status", "received").gte("received_at", `${startPrev}T00:00:00`).lt("received_at", `${endPrev}T00:00:00`),
+      supabase.from("commission_records").select("amount, received_at").eq("status", "received").gte("received_at", `${sixMonthsAgo}T00:00:00`),
+      supabase.from("commission_records").select("amount").eq("status", "pending"),
+      supabase.from("expenses").select("amount, expense_date").gte("expense_date", startOfMonth).lt("expense_date", nextMonthStart),
       supabase.from("inventory_bikes").select("status, purchase_price, bike_models(name)"),
-      supabase.from("cr_plates").select("id").eq("cr_status", "pending"),
-      supabase.from("cr_plates").select("id").eq("plate_status", "pending"),
-      supabase.from("cheques").select("id, cheque_number, amount, payment_date, pay_to, type").eq("status", "pending").lte("payment_date", in7Str),
+      supabase.from("cr_number_plates").select("id").eq("cr_status", "pending"),
+      supabase.from("cr_number_plates").select("id").eq("plate_status", "pending"),
+      supabase.from("cheques").select("id, cheque_number, amount, payment_date, pay_to, type").eq("status", "pending").gte("payment_date", today).lte("payment_date", in7Str),
       supabase.from("attendance").select("status").eq("date", today),
+      supabase.from("employees").select("id", { count: "exact", head: true }).eq("is_active", true),
       supabase.from("sales").select("id, invoice_number, customers(full_name), inventory_bikes(bike_models(name)), payment_type, sale_date").eq("status", "completed").order("created_at", { ascending: false }).limit(7),
-      supabase.from("profiles").select("full_name").limit(1).single(),
+      supabase.auth.getUser(),
     ]);
+
+    let userName = "Admin";
+    if (authR.data.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", authR.data.user.id)
+        .maybeSingle();
+      userName = profile?.full_name?.split(" ")[0] || authR.data.user.email?.split("@")[0] || "Admin";
+    }
 
     const todayCommArr = todayCommR.data || [];
     const monthCommArr = monthCommR.data || [];
     const prevCommArr = prevCommR.data || [];
     const histCommArr = histCommR.data || [];
+    const pendingCommArr = pendingCommR.data || [];
     const expArr = expR.data || [];
     const invArr = invR.data || [];
     const attArr = attR.data || [];
     const chqArr = chqR.data || [];
+    const monthCount = monthSalesCountR.data?.length || 0;
+    const prevMonthCount = prevMonthSalesR.data?.length || 0;
+    const totalEmployees = empCountR.count || 0;
+    const pendingIncome = pendingCommArr.reduce((s, r) => s + Number(r.amount || 0), 0);
+    const pendingIncomeCount = pendingCommArr.length;
 
     const todaySales = todayCommArr.reduce((s, r) => s + Number(r.amount || 0), 0);
     const monthRevenue = monthCommArr.reduce((s, r) => s + Number(r.amount || 0), 0);
@@ -137,7 +158,8 @@ export default function DashboardPage() {
     const tvsComm = monthByCat.tvs;
     const finComm = monthByCat.finance;
     const insComm = monthByCat.insurance;
-    const stockValue = invArr.filter(b => b.status === "available").reduce((s, b) => s + (b.purchase_price || 0), 0);
+    const otherIncome = monthByCat.transport + monthByCat.documentation + monthByCat.other;
+    const stockValue = invArr.filter(b => b.status === "in_stock").reduce((s, b) => s + (b.purchase_price || 0), 0);
 
     const incomeByDate: Record<string, number> = {};
     const expByDate: Record<string, number> = {};
@@ -172,21 +194,16 @@ export default function DashboardPage() {
       const name = (bm as { name?: string } | null)?.name || "Unknown";
       if (!modelMap[name]) modelMap[name] = { model: name, available: 0, sold: 0, reserved: 0, total: 0 };
       modelMap[name].total++;
-      if (b.status === "available") modelMap[name].available++;
+      if (b.status === "in_stock") modelMap[name].available++;
       else if (b.status === "sold") modelMap[name].sold++;
       else if (b.status === "reserved") modelMap[name].reserved++;
     }
 
-    const payTypeIncome: Record<string, number> = { cash: 0, finance: 0, insurance: 0 };
-    for (const c of monthCommArr) {
-      const sale = Array.isArray(c.sales) ? c.sales[0] : c.sales;
-      const pt = (sale as { payment_type?: string } | null)?.payment_type || "cash";
-      payTypeIncome[pt] = (payTypeIncome[pt] || 0) + Number(c.amount || 0);
-    }
     const salesDist = [
-      { name: "Cash", value: payTypeIncome.cash || 0, color: "#FF4C00" },
-      { name: "Finance", value: payTypeIncome.finance || 0, color: "#3B82F6" },
-      { name: "Insurance", value: payTypeIncome.insurance || 0, color: "#8B5CF6" },
+      { name: "TVS", value: monthByCat.tvs, color: "#FF4C00" },
+      { name: "Finance", value: monthByCat.finance, color: "#3B82F6" },
+      { name: "Insurance", value: monthByCat.insurance, color: "#8B5CF6" },
+      { name: "Other", value: otherIncome, color: "#10B981" },
     ].filter(d => d.value > 0);
     if (!salesDist.length) salesDist.push({ name: "No Income", value: 1, color: "#E5E5E5" });
 
@@ -221,7 +238,7 @@ export default function DashboardPage() {
 
     setData({
       todaySales, todayCount: todaySalesR.data?.length || 0,
-      monthRevenue, monthCount: monthSalesCountR.data?.length || 0,
+      monthRevenue, monthCount, prevMonthCount,
       monthExpenses, stockValue,
       pendingCR: crR.data?.length || 0, pendingPlates: plR.data?.length || 0,
       pendingCheques: chqArr.length, pendingChequeAmount: chqArr.reduce((s, c) => s + c.amount, 0),
@@ -229,18 +246,23 @@ export default function DashboardPage() {
       prevTvs: prevByCat.tvs,
       prevFinance: prevByCat.finance,
       prevInsurance: prevByCat.insurance,
-      presentToday: attArr.filter(a => a.status === "present").length,
+      presentToday: attArr.filter(a => a.status === "present" || a.status === "half_day").length,
       absentToday: attArr.filter(a => a.status === "absent").length,
-      leaveToday: attArr.filter(a => ["casual_leave", "sick_leave", "annual_leave"].includes(a.status)).length,
-      totalEmployees: attArr.length,
+      leaveToday: attArr.filter(a => ["sick_leave", "casual_leave", "holiday"].includes(a.status)).length,
+      totalEmployees,
       recentSales, inventoryByModel: Object.values(modelMap).sort((a, b) => b.total - a.total).slice(0, 7),
       revenueSeries, monthlySales, salesDist,
       reminders: chqArr.slice(0, 5).map(c => ({
-        id: c.cheque_number, type: "cheque",
-        label: `${c.cheque_number} · ${c.pay_to || c.type?.toUpperCase() || "Cheque"}`,
-        date: c.payment_date || today, amount: c.amount,
+        id: c.id,
+        type: "cheque",
+        label: `${c.cheque_number} · ${c.pay_to || (c.type === "tvs" ? "TVS" : "Other")}`,
+        date: c.payment_date || today,
+        amount: c.amount,
+        href: c.type === "tvs" ? "/cheques/tvs" : "/cheques/other",
       })),
-      userName: (profR.data?.full_name as string | null)?.split(" ")[0] || "Admin",
+      pendingIncome,
+      pendingIncomeCount,
+      userName,
     });
     setLoading(false);
   }, []);
@@ -250,16 +272,21 @@ export default function DashboardPage() {
   if (loading) return <Skeleton />;
   if (!data) return null;
 
+  const todayDate = new Date();
   const profit = data.monthRevenue - data.monthExpenses;
   const attPct = data.totalEmployees > 0 ? Math.round((data.presentToday / data.totalEmployees) * 100) : 0;
-  const monthPct = data.monthCount > 0 ? Math.min(Math.round((data.monthCount / 30) * 100), 100) : 0;
+  const daysInMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0).getDate();
+  const dayOfMonth = todayDate.getDate();
+  const monthProgressPct = Math.round((dayOfMonth / daysInMonth) * 100);
+  const salesGrowthPct = data.prevMonthCount > 0
+    ? Math.round(((data.monthCount - data.prevMonthCount) / data.prevMonthCount) * 100)
+    : data.monthCount > 0 ? 100 : 0;
   const weekData = data.revenueSeries.slice(-7);
   const availableBikes = data.inventoryByModel.reduce((s, m) => s + m.available, 0);
   const totalBikes = data.inventoryByModel.reduce((s, m) => s + m.total, 0);
   const stockPct = totalBikes > 0 ? Math.round((availableBikes / totalBikes) * 100) : 0;
 
   // Week calendar dates
-  const todayDate = new Date();
   const dayOfWeek = todayDate.getDay();
   const monday = new Date(todayDate);
   monday.setDate(todayDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
@@ -283,19 +310,19 @@ export default function DashboardPage() {
           <div className="p-7" style={CARD}>
             {/* Card header */}
             <div className="flex items-start justify-between mb-7">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
-                  <ShoppingCart className="h-5 w-5 text-[#374151]" />
+              <Link href="/sales" className="flex items-center gap-4 group">
+                <div className="w-12 h-12 rounded-2xl bg-[#F3F4F6] flex items-center justify-center flex-shrink-0 group-hover:bg-[#FF4C00]/10 transition-colors">
+                  <ShoppingCart className="h-5 w-5 text-[#374151] group-hover:text-[#FF4C00]" />
                 </div>
                 <div>
-                  <h1 className="text-[26px] font-bold text-[#111827] leading-tight" style={H}>
+                  <h1 className="text-[26px] font-bold text-[#111827] leading-tight group-hover:text-[#FF4C00] transition-colors" style={H}>
                     Sales Overview
                   </h1>
                   <p className="text-[12.5px] text-[#9CA3AF] mt-0.5">
                     Monitor daily sales and track overall dealership performance trends.
                   </p>
                 </div>
-              </div>
+              </Link>
               <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4B5563] bg-[#F9FAFB] border border-[#E5E7EB] px-3 py-1.5 rounded-xl flex-shrink-0">
                 <Calendar className="h-3.5 w-3.5 text-[#9CA3AF]" />
                 {new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
@@ -306,35 +333,40 @@ export default function DashboardPage() {
             <div className="flex gap-10">
               {/* LEFT: stacked metrics */}
               <div className="flex-shrink-0 w-44 space-y-6">
-                {/* Today count */}
-                <div>
+                <Link href="/sales" className="block group">
                   <div className="flex items-end gap-1.5 leading-none">
-                    <span className="text-[54px] font-black text-[#111827] tabular-nums tracking-tight" style={H}>
+                    <span className="text-[54px] font-black text-[#111827] tabular-nums tracking-tight group-hover:text-[#FF4C00] transition-colors" style={H}>
                       {data.todayCount}
                     </span>
-                    <span className="text-[22px] font-semibold text-[#D1D5DB] pb-2">/30</span>
                   </div>
-                  <p className="text-[12px] text-[#9CA3AF] font-medium mt-2">Today&#39;s Sales</p>
-                </div>
-                {/* Revenue inline */}
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-[14px] font-bold text-[#374151] tabular-nums">{fmtFull(data.todaySales)}</span>
-                  <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">RECEIVED TODAY</span>
-                </div>
-                {/* Monthly % */}
-                <div>
-                  <div className="text-[38px] font-black text-[#111827] leading-none tabular-nums tracking-tight" style={H}>
-                    {monthPct}%
+                  <p className="text-[12px] text-[#9CA3AF] font-medium mt-2 group-hover:text-[#FF4C00]">Today&#39;s Sales →</p>
+                </Link>
+                <Link href="/income" className="block group">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-[14px] font-bold text-[#374151] tabular-nums group-hover:text-[#FF4C00]">{fmtFull(data.todaySales)}</span>
                   </div>
-                  <p className="text-[12px] text-[#9CA3AF] font-medium mt-2">Monthly Performance</p>
-                </div>
+                  <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest group-hover:text-[#FF4C00]">Received Today →</span>
+                </Link>
+                <Link href="/sales" className="block group">
+                  <div className="text-[38px] font-black text-[#111827] leading-none tabular-nums tracking-tight group-hover:text-[#FF4C00] transition-colors" style={H}>
+                    {data.monthCount}
+                  </div>
+                  <p className="text-[12px] text-[#9CA3AF] font-medium mt-2">
+                    Sales This Month
+                    {salesGrowthPct !== 0 && (
+                      <span className={`ml-1 font-bold ${salesGrowthPct > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                        ({salesGrowthPct > 0 ? "+" : ""}{salesGrowthPct}% vs last month)
+                      </span>
+                    )}
+                  </p>
+                </Link>
               </div>
 
               {/* RIGHT: bar chart */}
               <div className="flex-1 min-w-0 flex flex-col">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">
-                    {fmtFull(data.monthRevenue)} RECEIVED THIS MONTH
+                    <Link href="/income" className="hover:text-[#FF4C00] transition-colors">{fmtFull(data.monthRevenue)} RECEIVED THIS MONTH →</Link>
                   </span>
                   <Link href="/sales/new"
                     className="flex items-center gap-1.5 h-7 px-3 bg-[#111827] text-white text-[11px] font-semibold rounded-lg hover:bg-[#1F2937] transition-colors flex-shrink-0">
@@ -368,12 +400,12 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-5">
 
             {/* Revenue & Finance — like "Payroll & Finance Snapshot" */}
-            <div className="p-6" style={CARD}>
+            <Link href="/income" className="p-6 block hover:ring-2 hover:ring-[#FF4C00]/20 transition-all rounded-[20px]" style={CARD}>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl bg-[#F3F4F6] flex items-center justify-center">
                   <DollarSign className="h-4.5 w-4.5 text-[#374151]" style={{ width: 18, height: 18 }} />
                 </div>
-                <span className="text-[15px] font-bold text-[#111827]" style={H}>Income &amp; Finance</span>
+                <span className="text-[15px] font-bold text-[#111827]" style={H}>Income &amp; Finance →</span>
               </div>
               <p className="text-[12px] text-[#9CA3AF] mb-1.5">Received commissions &amp; charges this month</p>
               <div className="flex items-end gap-2.5 leading-none mb-1.5">
@@ -393,8 +425,13 @@ export default function DashboardPage() {
               </div>
               <p className="text-[12px] text-[#9CA3AF]">
                 Net: <span className={profit >= 0 ? "text-emerald-600 font-semibold" : "text-red-500 font-semibold"}>{fmtFull(Math.abs(profit))}</span>
-                {" · "}{data.monthCount} sales
+                {" · "}{data.monthCount} sales · {fmtFull(data.monthExpenses)} expenses
               </p>
+              {data.pendingIncomeCount > 0 && (
+                <p className="text-[11px] text-amber-600 font-semibold mt-2">
+                  {data.pendingIncomeCount} pending · {fmtFull(data.pendingIncome)} not received yet
+                </p>
+              )}
               <div className="mt-5 pt-4 border-t border-[#F5F5F5]">
                 <div className="grid grid-cols-3 gap-3">
                   {[
@@ -424,7 +461,7 @@ export default function DashboardPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </Link>
 
             {/* Stock Health — bar chart */}
             <div className="p-6 flex flex-col" style={CARD}>
@@ -492,6 +529,32 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* ── Quick Access ─────────────────────────────────── */}
+          <div className="p-6" style={CARD}>
+            <p className="text-[13px] font-bold text-[#111827] mb-4" style={H}>Quick Access</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+              {[
+                { label: "New Sale", href: "/sales/new", icon: ShoppingCart },
+                { label: "Sales", href: "/sales", icon: ShoppingCart },
+                { label: "Income", href: "/income", icon: DollarSign },
+                { label: "Expenses", href: "/expenses", icon: Wallet },
+                { label: "Inventory", href: "/inventory/bikes", icon: Package },
+                { label: "Customers", href: "/customers", icon: UserCheck },
+                { label: "CR & Plates", href: "/cr-plates", icon: Hash },
+                { label: "Reports", href: "/reports", icon: ArrowUpRight },
+              ].map(({ label, href, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border border-[#F0F0F0] hover:border-[#FF4C00]/30 hover:bg-[#FF4C00]/5 transition-all text-center"
+                >
+                  <Icon className="h-4 w-4 text-[#6B7280]" />
+                  <span className="text-[10px] font-semibold text-[#374151]">{label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
           {/* ── Pending Actions — like "Workload Balance Monitor" ── */}
           <div className="p-6" style={CARD}>
             <div className="flex items-center gap-3 mb-5">
@@ -503,12 +566,13 @@ export default function DashboardPage() {
                 <p className="text-[11.5px] text-[#9CA3AF] mt-0.5">Items requiring your attention — CR, plates, and cheque deadlines.</p>
               </div>
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               {[
                 { label: "CR Pending", value: data.pendingCR, icon: FileCheck, href: "/cr-plates", urgent: data.pendingCR > 0, color: "#F59E0B", bg: "#FFFBEB" },
                 { label: "Plates Pending", value: data.pendingPlates, icon: Hash, href: "/cr-plates", urgent: false, color: "#3B82F6", bg: "#EFF6FF" },
                 { label: "Cheques Due", value: data.pendingCheques, icon: CreditCard, href: "/cheques/tvs", urgent: data.pendingCheques > 0, color: "#EF4444", bg: "#FEF2F2" },
-                { label: "Amount Due", value: null, amount: data.pendingChequeAmount, icon: Wallet, href: "/finance", urgent: false, color: "#8B5CF6", bg: "#F5F3FF" },
+                { label: "Pending Income", value: data.pendingIncomeCount, icon: DollarSign, href: "/income", urgent: data.pendingIncomeCount > 0, color: "#8B5CF6", bg: "#F5F3FF" },
+                { label: "Amount Due", value: null, amount: data.pendingChequeAmount, icon: Wallet, href: "/cheques/tvs", urgent: false, color: "#6366F1", bg: "#EEF2FF" },
               ].map(({ label, value, amount, icon: Icon, href, urgent, color, bg }) => (
                 <Link key={label} href={href}
                   className={`rounded-2xl p-4 flex flex-col gap-3 transition-opacity hover:opacity-90 ${urgent ? "ring-1 ring-red-200" : ""}`}
@@ -554,14 +618,14 @@ export default function DashboardPage() {
             </div>
             {/* Quick stat tiles */}
             <div className="grid grid-cols-2 gap-2 mt-4">
-              <div className="bg-[#F9FAFB] rounded-xl px-3 py-2.5">
+              <Link href="/sales" className="bg-[#F9FAFB] rounded-xl px-3 py-2.5 hover:bg-[#FF4C00]/5 transition-colors">
                 <p className="text-[20px] font-black text-[#111827] tabular-nums leading-none" style={H}>{data.todayCount}</p>
-                <p className="text-[10px] text-[#9CA3AF] font-semibold mt-1">Sales Today</p>
-              </div>
-              <div className="bg-[#F9FAFB] rounded-xl px-3 py-2.5">
+                <p className="text-[10px] text-[#9CA3AF] font-semibold mt-1">Sales Today →</p>
+              </Link>
+              <Link href="/hr/attendance" className="bg-[#F9FAFB] rounded-xl px-3 py-2.5 hover:bg-[#FF4C00]/5 transition-colors">
                 <p className="text-[20px] font-black text-[#111827] tabular-nums leading-none" style={H}>{data.presentToday}</p>
-                <p className="text-[10px] text-[#9CA3AF] font-semibold mt-1">Present Today</p>
-              </div>
+                <p className="text-[10px] text-[#9CA3AF] font-semibold mt-1">Present Today →</p>
+              </Link>
             </div>
           </div>
 
@@ -581,7 +645,7 @@ export default function DashboardPage() {
                   const diff = Math.ceil((new Date(r.date).getTime() - new Date().setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24));
                   const isUrgent = diff <= 1;
                   return (
-                    <div key={r.id + i} className="flex items-start justify-between gap-2">
+                    <Link key={r.id + i} href={r.href} className="flex items-start justify-between gap-2 hover:bg-[#F9FAFB] -mx-2 px-2 py-1 rounded-lg transition-colors">
                       <div className="flex-1 min-w-0">
                         <p className="text-[12.5px] font-semibold text-[#111827] truncate">{r.label}</p>
                         <p className="text-[11px] text-[#9CA3AF] mt-0.5">
@@ -594,7 +658,7 @@ export default function DashboardPage() {
                           Pay Now
                         </span>
                       )}
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -603,16 +667,21 @@ export default function DashboardPage() {
 
           {/* ── Recent Sales (like "Recent Attendance") ────── */}
           <div className="p-5 border-b border-[#F5F5F5]">
-            <div className="flex items-center gap-2 mb-3.5">
-              <ShoppingCart className="h-4 w-4 text-[#9CA3AF]" />
-              <h3 className="text-[13px] font-bold text-[#111827]" style={H}>Recent Sales</h3>
+            <div className="flex items-center justify-between mb-3.5">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-[#9CA3AF]" />
+                <h3 className="text-[13px] font-bold text-[#111827]" style={H}>Recent Sales</h3>
+              </div>
+              <Link href="/sales" className="text-[11px] font-semibold text-[#FF4C00] hover:underline flex items-center gap-0.5">
+                All <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
             {data.recentSales.length === 0 ? (
-              <p className="text-[12px] text-[#9CA3AF]">No sales recorded yet</p>
+              <p className="text-[12px] text-[#9CA3AF]">No sales recorded yet · <Link href="/sales/new" className="text-[#FF4C00] font-semibold hover:underline">Create first sale</Link></p>
             ) : (
               <div className="space-y-4">
                 {data.recentSales.slice(0, 4).map(s => (
-                  <div key={s.id} className="flex items-center gap-3">
+                  <Link key={s.id} href="/sales/invoices" className="flex items-center gap-3 hover:bg-[#F9FAFB] -mx-2 px-2 py-1 rounded-lg transition-colors">
                     <div className="w-9 h-9 rounded-full bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
                       <span className="text-[11px] font-bold text-[#374151]">
                         {s.customer_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
@@ -628,17 +697,20 @@ export default function DashboardPage() {
                         {s.payment_type.charAt(0).toUpperCase() + s.payment_type.slice(1)}
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
           </div>
 
           {/* ── Attendance donut (like "Recent Attendance") ── */}
-          <div className="p-5">
-            <div className="flex items-center gap-2 mb-3.5">
-              <UserCheck className="h-4 w-4 text-[#9CA3AF]" />
-              <h3 className="text-[13px] font-bold text-[#111827]" style={H}>Attendance Today</h3>
+          <Link href="/hr/attendance" className="p-5 block hover:bg-[#FAFAFA] transition-colors rounded-b-[20px]">
+            <div className="flex items-center justify-between mb-3.5">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-[#9CA3AF]" />
+                <h3 className="text-[13px] font-bold text-[#111827]" style={H}>Attendance Today →</h3>
+              </div>
+              <span className="text-[10px] text-[#9CA3AF]">{data.totalEmployees} employees</span>
             </div>
             <div className="flex items-center gap-4">
               {/* Donut */}
@@ -665,10 +737,10 @@ export default function DashboardPage() {
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums ${s.badge}`}>{s.value}</span>
                   </div>
                 ))}
-                {data.totalEmployees === 0 && <p className="text-[10px] text-[#9CA3AF]">No attendance data</p>}
+                {data.totalEmployees === 0 && <p className="text-[10px] text-[#9CA3AF]">No employees · <span className="text-[#FF4C00]">Add in HR</span></p>}
               </div>
             </div>
-          </div>
+          </Link>
 
         </div>{/* end right panel card */}
 
