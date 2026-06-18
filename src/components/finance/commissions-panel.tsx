@@ -8,6 +8,7 @@ import {
   markCommissionReceived,
   markCommissionPending,
   COMMISSION_CATEGORY_LABELS,
+  EXTERNAL_COMMISSION_CATEGORIES,
   type CommissionCategory,
 } from "@/lib/finance/commission-records";
 
@@ -48,6 +49,7 @@ export function CommissionsPanel({ onUpdated, className }: { onUpdated?: () => v
         id, sale_id, category, amount, status, received_at, created_at,
         sales(invoice_number, sale_date, customers(full_name), inventory_bikes(round_number, bike_models(name)))
       `)
+      .in("category", EXTERNAL_COMMISSION_CATEGORIES)
       .order("created_at", { ascending: false })
       .limit(300);
     if (filter !== "all") q = q.eq("status", filter);

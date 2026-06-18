@@ -16,6 +16,7 @@ interface LeaveRequest {
   days: number;
   reason?: string;
   status: "pending" | "approved" | "rejected";
+  attendance_date?: string | null;
   created_at: string;
   employees: { full_name: string } | null;
 }
@@ -49,7 +50,7 @@ export default function LeavePage() {
     const [leavesRes, empRes] = await Promise.all([
       supabase
         .from("leaves")
-        .select("*, employees!leaves_employee_id_fkey(full_name)")
+        .select("id, type, from_date, to_date, days, reason, status, attendance_date, created_at, employees!leaves_employee_id_fkey(full_name)")
         .order("created_at", { ascending: false }),
       supabase
         .from("employees")
@@ -240,9 +241,16 @@ export default function LeavePage() {
                       </div>
                     </td>
                     <td className="r-td">
-                      <span className="text-[12px] text-[#4A4A4A]">
-                        {LEAVE_TYPES[leave.type] || leave.type}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[12px] text-[#4A4A4A]">
+                          {LEAVE_TYPES[leave.type] || leave.type}
+                        </span>
+                        {leave.attendance_date && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                            From Attendance
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="r-td">
                       <span className="text-[12px] text-[#4A4A4A]">

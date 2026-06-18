@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   full_name TEXT,
   email TEXT,
-  role TEXT NOT NULL DEFAULT 'employee' CHECK (role IN ('admin', 'manager', 'employee')),
+  role TEXT NOT NULL DEFAULT 'worker' CHECK (role IN ('admin', 'manager', 'worker', 'accountant')),
   phone TEXT,
   avatar_url TEXT,
   is_active BOOLEAN DEFAULT true,
@@ -29,11 +29,20 @@ CREATE POLICY "Users can view own profile" ON public.profiles
 CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
-CREATE POLICY "Admins can view all profiles" ON public.profiles
-  FOR ALL USING (
+CREATE POLICY "Admins and managers can view all profiles" ON public.profiles
+  FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
+      SELECT 1 FROM public.profiles me
+      WHERE me.id = auth.uid() AND me.role IN ('admin', 'manager')
+    )
+    OR auth.uid() = id
+  );
+
+CREATE POLICY "Admins and managers can update any profile" ON public.profiles
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles me
+      WHERE me.id = auth.uid() AND me.role IN ('admin', 'manager')
     )
   );
 
@@ -55,6 +64,35 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Backfill auth users that were created before the trigger existed
+CREATE OR REPLACE FUNCTION public.sync_missing_profiles()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  inserted_count integer;
+BEGIN
+  WITH ins AS (
+    INSERT INTO public.profiles (id, email, full_name, role)
+    SELECT
+      u.id,
+      u.email,
+      COALESCE(u.raw_user_meta_data->>'full_name', split_part(u.email, '@', 1)),
+      'worker'
+    FROM auth.users u
+    LEFT JOIN public.profiles p ON p.id = u.id
+    WHERE p.id IS NULL
+    RETURNING 1
+  )
+  SELECT COUNT(*)::integer INTO inserted_count FROM ins;
+  RETURN inserted_count;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.sync_missing_profiles() TO authenticated;
 
 -- ============================================================
 -- EMPLOYEES
@@ -402,6 +440,7 @@ CREATE TABLE IF NOT EXISTS public.leaves (
   days INT,
   reason TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  attendance_date DATE,
   approved_by UUID REFERENCES public.employees(id),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

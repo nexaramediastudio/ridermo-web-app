@@ -211,7 +211,8 @@ export default function NewSalePage() {
       await supabase.from("inventory_bikes").update({ status: "sold" }).eq("id", selectedBike!.id);
       await supabase.from("cr_number_plates").insert({ sale_id: sale.id, bike_id: selectedBike!.id, customer_id: customerId, cr_status: "pending", plate_status: "pending" });
 
-      // ── Pending commission records (revenue recognized when marked Received) ──
+      // ── Commission records: dealership earnings auto-received; external commissions pending ──
+      const saleDateStr = new Date().toISOString().split("T")[0];
       await createPendingCommissionRecords(supabase, sale.id, {
         tvs_commission: parseFloat(tvsCommission) || 0,
         finance_commission: parseFloat(finance.commission) || 0,
@@ -219,13 +220,12 @@ export default function NewSalePage() {
         transport_charges: parseFloat(transportCharges) || 0,
         documentation_charges: parseFloat(documentationCharges) || 0,
         other_earnings: parseFloat(otherEarnings) || 0,
-      });
+      }, saleDateStr);
 
       // ── Worker commissions (synced from attendance for sale date) ──
-      const saleDate = new Date().toISOString().split("T")[0];
-      await syncWorkerCommissionsForDate(supabase, saleDate);
+      await syncWorkerCommissionsForDate(supabase, saleDateStr);
 
-      toast.success(`Sale completed! Invoice: ${invoiceNumber}. Commissions pending until marked Received.`);
+      toast.success(`Sale completed! Invoice: ${invoiceNumber}. Dealership earnings added to revenue.`);
       router.push(`/sales`);
     } catch (err: unknown) {
       toast.error((err as Error).message || "Failed to complete sale");
@@ -583,7 +583,7 @@ export default function NewSalePage() {
               <div className="space-y-4 p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl">
                 <p className="text-[12px] font-semibold text-emerald-800 flex items-center gap-2">
                   <CreditCard className="h-3.5 w-3.5" /> Dealership Earnings
-                  <span className="text-[10px] font-normal text-emerald-600">— counted as revenue</span>
+                  <span className="text-[10px] font-normal text-emerald-600">— collected at sale, added to revenue automatically</span>
                 </p>
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Transport (Rs.)">

@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Calendar, ChevronLeft, ChevronRight, Save, UserCheck, UserX, Clock, Stethoscope, Umbrella, Sun } from "lucide-react";
 import { syncWorkerCommissionsForDate } from "@/lib/hr/worker-commissions";
+import { syncLeavesFromAttendance } from "@/lib/hr/sync-leaves-from-attendance";
+import { useRole } from "@/components/providers/role-provider";
 
 type AttendanceStatus = "present" | "absent" | "half_day" | "sick_leave" | "casual_leave" | "holiday";
 
@@ -18,7 +20,7 @@ interface Employee {
 
 interface AttendanceRecord {
   employee_id: string;
-  status: AttendanceStatus;
+  status: AttendanceStatus | null;
   check_in?: string;
   check_out?: string;
   ot_hours?: number;
@@ -33,17 +35,16 @@ const STATUS_OPTIONS: { value: AttendanceStatus; label: string; icon: React.Elem
   { value: "holiday", label: "Holiday", icon: Sun, color: "text-orange-700", bg: "bg-orange-50 border-orange-200" },
 ];
 
-function getStatusStyle(status: AttendanceStatus) {
-  return STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
-}
-
 export default function AttendancePage() {
+  const { role, employeeId } = useRole();
+  const isSelfOnly = role === "worker";
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<Record<string, AttendanceRecord>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-  const [hasExisting, setHasExisting] = useState(false);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [draftIds, setDraftIds] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -54,48 +55,95 @@ export default function AttendancePage() {
       supabase.from("attendance").select("*").eq("date", selectedDate),
     ]);
 
-    const emps = empResult.data || [];
+    const emps = (empResult.data || []).filter((e) =>
+      !isSelfOnly || (employeeId && e.id === employeeId),
+    );
     const existingAtt = attResult.data || [];
 
     setEmployees(emps);
-    setHasExisting(existingAtt.length > 0);
 
-    // Build attendance map: default all to present
+    const saved = new Set(existingAtt.map((a) => a.employee_id));
+    setSavedIds(saved);
+    setDraftIds(new Set());
+
     const attMap: Record<string, AttendanceRecord> = {};
     emps.forEach((emp) => {
       const existing = existingAtt.find((a) => a.employee_id === emp.id);
       attMap[emp.id] = existing
-        ? { employee_id: emp.id, status: existing.status, check_in: existing.check_in, check_out: existing.check_out, ot_hours: existing.ot_hours }
-        : { employee_id: emp.id, status: "present" };
+        ? {
+            employee_id: emp.id,
+            status: existing.status as AttendanceStatus,
+            check_in: existing.check_in,
+            check_out: existing.check_out,
+            ot_hours: existing.ot_hours,
+          }
+        : { employee_id: emp.id, status: null };
     });
     setAttendance(attMap);
     setLoading(false);
-  }, [selectedDate]);
+  }, [selectedDate, isSelfOnly, employeeId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   function setStatus(empId: string, status: AttendanceStatus) {
     setAttendance((prev) => ({ ...prev, [empId]: { ...prev[empId], status } }));
+    setDraftIds((prev) => new Set(prev).add(empId));
+  }
+
+  function clearMark(empId: string) {
+    setAttendance((prev) => ({ ...prev, [empId]: { ...prev[empId], status: null, ot_hours: 0 } }));
+    setDraftIds((prev) => new Set(prev).add(empId));
+  }
+
+  function isMarked(empId: string) {
+    const rec = attendance[empId];
+    return rec?.status != null;
+  }
+
+  function markState(empId: string): "saved" | "draft" | "not_marked" {
+    if (isMarked(empId) && savedIds.has(empId) && !draftIds.has(empId)) return "saved";
+    if (isMarked(empId)) return "draft";
+    if (savedIds.has(empId)) return "draft";
+    return "not_marked";
   }
 
   function markAll(status: AttendanceStatus) {
     const updated = { ...attendance };
-    Object.keys(updated).forEach((id) => { updated[id] = { ...updated[id], status }; });
+    const nextDraft = new Set(draftIds);
+    Object.keys(updated).forEach((id) => {
+      updated[id] = { ...updated[id], status };
+      nextDraft.add(id);
+    });
     setAttendance(updated);
+    setDraftIds(nextDraft);
   }
 
   async function handleSave() {
     setSaving(true);
     const supabase = createClient();
 
-    const records = Object.values(attendance).map((rec) => ({
-      employee_id: rec.employee_id,
-      date: selectedDate,
-      status: rec.status,
-      check_in: rec.check_in || null,
-      check_out: rec.check_out || null,
-      ot_hours: rec.ot_hours || 0,
-    }));
+    const records = Object.values(attendance)
+      .filter((rec) => rec.status != null)
+      .map((rec) => ({
+        employee_id: rec.employee_id,
+        date: selectedDate,
+        status: rec.status!,
+        check_in: rec.check_in || null,
+        check_out: rec.check_out || null,
+        ot_hours: rec.ot_hours || 0,
+      }));
+
+    if (records.length === 0) {
+      toast.error("Mark at least one employee before saving");
+      setSaving(false);
+      return;
+    }
+
+    const unmarkedCount = employees.length - records.length;
+    if (unmarkedCount > 0 && !window.confirm(`${unmarkedCount} employee(s) still not marked. Save ${records.length} marked only?`)) {
+      setSaving(false);
+      return;
+    }
 
     const { error } = await supabase
       .from("attendance")
@@ -103,21 +151,30 @@ export default function AttendancePage() {
 
     if (error) toast.error(error.message);
     else {
+      const toRemove = [...savedIds].filter((id) => !records.some((r) => r.employee_id === id));
+      if (toRemove.length) {
+        await supabase.from("attendance").delete().eq("date", selectedDate).in("employee_id", toRemove);
+      }
+
       try {
         const { added, removed } = await syncWorkerCommissionsForDate(supabase, selectedDate);
-        if (added > 0) {
-          toast.success(
-            `Attendance saved — ${added} bike commission${added !== 1 ? "s" : ""} added for sales on this date`
-          );
-        } else if (removed > 0) {
-          toast.success(`Attendance saved — ${removed} bike commission${removed !== 1 ? "s" : ""} removed`);
-        } else {
-          toast.success("Attendance saved successfully");
+        const { synced: leaveSynced } = await syncLeavesFromAttendance(supabase, selectedDate, records);
+
+        const parts: string[] = ["Attendance saved"];
+        if (leaveSynced > 0) {
+          parts.push(`${leaveSynced} leave record${leaveSynced !== 1 ? "s" : ""} added to Leave Management`);
         }
+        if (added > 0) {
+          parts.push(`${added} bike commission${added !== 1 ? "s" : ""} added`);
+        } else if (removed > 0) {
+          parts.push(`${removed} bike commission${removed !== 1 ? "s" : ""} removed`);
+        }
+        toast.success(parts.join(" · "));
       } catch (syncErr) {
-        toast.error((syncErr as Error).message || "Attendance saved but bike commissions failed to sync");
+        toast.error((syncErr as Error).message || "Attendance saved but sync failed");
       }
-      setHasExisting(true);
+      setSavedIds(new Set(records.map((r) => r.employee_id)));
+      setDraftIds(new Set());
     }
     setSaving(false);
   }
@@ -128,11 +185,16 @@ export default function AttendancePage() {
     setSelectedDate(d.toISOString().split("T")[0]);
   }
 
+  const markedCount = employees.filter((e) => isMarked(e.id)).length;
+  const notMarkedCount = employees.length - markedCount;
+  const savedCount = employees.filter((e) => markState(e.id) === "saved").length;
+  const hasExisting = savedIds.size > 0;
+
   const counts = {
     present: Object.values(attendance).filter((a) => a.status === "present").length,
     absent: Object.values(attendance).filter((a) => a.status === "absent").length,
     half_day: Object.values(attendance).filter((a) => a.status === "half_day").length,
-    leave: Object.values(attendance).filter((a) => ["sick_leave", "casual_leave"].includes(a.status)).length,
+    leave: Object.values(attendance).filter((a) => a.status != null && ["sick_leave", "casual_leave"].includes(a.status)).length,
     holiday: Object.values(attendance).filter((a) => a.status === "holiday").length,
   };
 
@@ -201,6 +263,45 @@ export default function AttendancePage() {
         </div>
       </div>
 
+      {/* Marked / Not Marked summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="r-kpi">
+          <div>
+            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">Marked</p>
+            <p className="text-xl font-bold tabular-nums mt-0.5 text-emerald-600">{markedCount}</p>
+          </div>
+          <UserCheck className="h-4 w-4 text-emerald-300" />
+        </div>
+        <div className="r-kpi">
+          <div>
+            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">Not Marked</p>
+            <p className="text-xl font-bold tabular-nums mt-0.5 text-amber-600">{notMarkedCount}</p>
+          </div>
+          <UserX className="h-4 w-4 text-amber-300" />
+        </div>
+        <div className="r-kpi">
+          <div>
+            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">Saved</p>
+            <p className="text-xl font-bold tabular-nums mt-0.5 text-[#0A0A0A]">{savedCount}</p>
+          </div>
+          <Save className="h-4 w-4 text-[#D5D5D5]" />
+        </div>
+        <div className="r-kpi">
+          <div>
+            <p className="text-[11px] font-semibold text-[#9A9A9A] uppercase tracking-wide">Unsaved changes</p>
+            <p className="text-xl font-bold tabular-nums mt-0.5 text-[#FF4C00]">{draftIds.size}</p>
+          </div>
+          <Clock className="h-4 w-4 text-[#FF4C00]/40" />
+        </div>
+      </div>
+
+      {notMarkedCount > 0 && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100 text-[12px] text-amber-800">
+          <UserX className="h-4 w-4 flex-shrink-0" />
+          <span><strong>{notMarkedCount}</strong> employee{notMarkedCount !== 1 ? "s" : ""} not marked yet — pick a status below, then Save.</span>
+        </div>
+      )}
+
       {/* Quick mark all */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider mr-1">Mark all:</span>
@@ -237,24 +338,53 @@ export default function AttendancePage() {
           </div>
         ) : (
           <div className="divide-y divide-[#F5F5F5]">
+            <div className="hidden sm:grid grid-cols-[140px_1fr_auto] gap-4 px-5 py-2 bg-[#FAFAFA] border-b border-[#F0F0F0]">
+              <span className="text-[10px] font-bold text-[#9A9A9A] uppercase">Marked?</span>
+              <span className="text-[10px] font-bold text-[#9A9A9A] uppercase">Employee &amp; Status</span>
+              <span className="text-[10px] font-bold text-[#9A9A9A] uppercase text-right">OT</span>
+            </div>
             {employees.map((emp) => {
               const rec = attendance[emp.id];
-              const currentStatus = rec?.status || "present";
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              const style = getStatusStyle(currentStatus);
+              const currentStatus = rec?.status ?? null;
+              const state = markState(emp.id);
+
+              const markBadge =
+                state === "saved"
+                  ? { label: "Marked", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" }
+                  : state === "draft" && isMarked(emp.id)
+                    ? { label: "Marked (unsaved)", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+                    : state === "draft"
+                      ? { label: "Not Marked (unsaved)", cls: "bg-red-50 text-red-600 border-red-200" }
+                      : { label: "Not Marked", cls: "bg-[#F5F5F5] text-[#9A9A9A] border-[#E8E8E8]" };
 
               return (
-                <div key={emp.id} className="flex items-center gap-5 px-5 py-3 hover:bg-[#FAFAFA] transition-colors">
+                <div key={emp.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 px-5 py-3 transition-colors ${state === "not_marked" ? "bg-amber-50/30" : "hover:bg-[#FAFAFA]"}`}>
+                  <div className="flex items-center gap-3 sm:w-[140px] flex-shrink-0">
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border whitespace-nowrap ${markBadge.cls}`}>
+                      {markBadge.label}
+                    </span>
+                    {state !== "not_marked" && (
+                      <button
+                        type="button"
+                        onClick={() => clearMark(emp.id)}
+                        className="text-[10px] font-semibold text-[#9A9A9A] hover:text-red-500 underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${emp.type === "director" ? "bg-[#FF4C00]/15 text-[#FF4C00]" : "bg-[#F5F5F5] text-[#6B6B6B]"}`}>
                     {emp.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
 
-                  <div className="w-52 flex-shrink-0">
+                  <div className="w-40 sm:w-52 flex-shrink-0 min-w-0">
                     <p className="text-[13px] font-semibold text-[#0A0A0A] truncate">{emp.full_name}</p>
                     <p className="text-[11px] text-[#9A9A9A] capitalize">{emp.type}{emp.employee_code ? ` · ${emp.employee_code}` : ""}</p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 flex-1">
+                  <div className="flex items-center gap-1.5 flex-1 flex-wrap">
                     {STATUS_OPTIONS.map((s) => (
                       <button
                         key={s.value}
@@ -270,9 +400,10 @@ export default function AttendancePage() {
                       </button>
                     ))}
                   </div>
+                  </div>
 
                   {currentStatus === "present" && (
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 sm:ml-auto pl-[152px] sm:pl-0">
                       <span className="text-[11px] text-[#9A9A9A] font-medium">OT</span>
                       <input
                         type="number"
@@ -280,12 +411,13 @@ export default function AttendancePage() {
                         max="12"
                         step="0.5"
                         value={rec?.ot_hours || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setDraftIds((prev) => new Set(prev).add(emp.id));
                           setAttendance((prev) => ({
                             ...prev,
                             [emp.id]: { ...prev[emp.id], ot_hours: parseFloat(e.target.value) || 0 },
-                          }))
-                        }
+                          }));
+                        }}
                         placeholder="0"
                         className="w-14 h-7 px-2 rounded-lg border border-[#E8E8E8] text-[11px] text-center focus:outline-none focus:border-[#FF4C00]"
                       />

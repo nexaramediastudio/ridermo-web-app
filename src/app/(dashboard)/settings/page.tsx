@@ -390,18 +390,62 @@ function CompanyList({ tableName, title, subtitle }: { tableName: "finance_compa
 function UsersSettings() {
   const [profiles, setProfiles] = useState<{ id: string; full_name?: string; email?: string; role: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [syncInfo, setSyncInfo] = useState<{ auth_users: number; profiles: number; in_sync: boolean } | null>(null);
+
+  const loadProfiles = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    const supabase = createClient();
+
+    await supabase.rpc("sync_missing_profiles");
+
+    const [usersRes, statusRes] = await Promise.all([
+      supabase.rpc("list_system_users"),
+      supabase.rpc("get_user_sync_status"),
+    ]);
+
+    if (usersRes.error) {
+      // Fallback if migration_020 not applied yet
+      const { data: fallback, error: fbErr } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, role")
+        .order("full_name");
+
+      if (fbErr || !fallback?.length) {
+        setLoadError(usersRes.error.message);
+        setProfiles([]);
+      } else {
+        setProfiles(fallback);
+        setLoadError(
+          "Run migration_020_user_sync_diagnostics.sql and migration_021_force_auth_profile_sync.sql in Supabase to show all Auth users.",
+        );
+      }
+    } else {
+      const rows = (usersRes.data as { id: string; full_name?: string; email?: string; role: string }[]) || [];
+      setProfiles(rows);
+      setLoadError(null);
+    }
+
+    if (statusRes.data && typeof statusRes.data === "object") {
+      const s = statusRes.data as { auth_users: number; profiles: number; in_sync: boolean };
+      setSyncInfo({ auth_users: s.auth_users, profiles: s.profiles, in_sync: s.in_sync });
+    }
+
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.from("profiles").select("id, full_name, email, role").order("role").then(({ data }) => {
-      setProfiles(data || []);
-      setLoading(false);
-    });
-  }, []);
+    loadProfiles();
+  }, [loadProfiles]);
 
   async function updateRole(id: string, role: string) {
     const supabase = createClient();
-    await supabase.from("profiles").update({ role }).eq("id", id);
+    const { error } = await supabase.rpc("update_user_role", { target_id: id, new_role: role });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     setProfiles((prev) => prev.map((p) => p.id === id ? { ...p, role } : p));
     toast.success("Role updated");
   }
@@ -409,15 +453,53 @@ function UsersSettings() {
   const ROLE_STYLES: Record<string, string> = {
     admin: "bg-[#FF4C00]/10 text-[#FF4C00]",
     manager: "bg-blue-50 text-blue-700",
+    worker: "bg-[#F5F5F5] text-[#6B6B6B]",
     employee: "bg-[#F5F5F5] text-[#6B6B6B]",
+    accountant: "bg-emerald-50 text-emerald-700",
   };
 
   return (
     <div className="space-y-4 max-w-2xl">
       <div>
         <h3 className="text-base font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>System Users</h3>
-        <p className="text-sm text-[#9A9A9A] mt-0.5">Manage access levels for each user</p>
+        <p className="text-sm text-[#9A9A9A] mt-0.5">
+          {loading
+            ? "Loading users…"
+            : syncInfo
+              ? `${profiles.length} shown · ${syncInfo.auth_users} login account${syncInfo.auth_users === 1 ? "" : "s"} in Supabase Auth`
+              : `${profiles.length} user${profiles.length === 1 ? "" : "s"}`}
+        </p>
       </div>
+
+      {!loading && syncInfo && syncInfo.auth_users <= 1 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
+          <p className="font-semibold">Only 1 login account found in Supabase Auth</p>
+          <p className="mt-1 text-amber-800">
+            HR → Employees does not create logins. Add staff under{" "}
+            <strong>Supabase → Authentication → Users → Add user</strong>, then click Retry below.
+          </p>
+        </div>
+      )}
+
+      {!loading && syncInfo && syncInfo.auth_users > 1 && profiles.length < syncInfo.auth_users && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
+          <p className="font-semibold">
+            {syncInfo.auth_users} Auth logins but only {profiles.length} showing
+          </p>
+          <p className="mt-1">
+            Run <strong>migration_021_force_auth_profile_sync.sql</strong> in Supabase SQL Editor, then click Retry sync.
+          </p>
+          <button onClick={loadProfiles} className="mt-2 text-xs font-semibold text-[#FF4C00] hover:underline">
+            Retry sync
+          </button>
+        </div>
+      )}
+
+      {!loading && loadError && profiles.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
+          {loadError}
+        </div>
+      )}
 
       <div className="space-y-2">
         {loading ? (
@@ -425,7 +507,17 @@ function UsersSettings() {
         ) : profiles.length === 0 ? (
           <div className="text-center py-8 text-[#ABABAB]">
             <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No users yet. Create a user in Supabase Auth first.</p>
+            {loadError ? (
+              <>
+                <p className="text-sm text-red-500">{loadError}</p>
+                <p className="text-xs mt-1">Run migration_020_user_sync_diagnostics.sql in Supabase, then refresh.</p>
+                <button onClick={loadProfiles} className="mt-3 text-xs font-semibold text-[#FF4C00] hover:underline">
+                  Retry sync
+                </button>
+              </>
+            ) : (
+              <p className="text-sm">No users yet. Create a user in Supabase Auth first.</p>
+            )}
           </div>
         ) : (
           profiles.map((profile) => (
@@ -442,13 +534,14 @@ function UsersSettings() {
                 </div>
               </div>
               <select
-                value={profile.role}
+                value={profile.role === "employee" ? "worker" : profile.role}
                 onChange={(e) => updateRole(profile.id, e.target.value)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-xl border-0 cursor-pointer focus:outline-none ${ROLE_STYLES[profile.role] || "bg-[#F5F5F5] text-[#6B6B6B]"}`}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-xl border-0 cursor-pointer focus:outline-none ${ROLE_STYLES[profile.role] || ROLE_STYLES[profile.role === "employee" ? "worker" : profile.role] || "bg-[#F5F5F5] text-[#6B6B6B]"}`}
               >
                 <option value="admin">Admin</option>
                 <option value="manager">Manager</option>
-                <option value="employee">Employee</option>
+                <option value="worker">Worker (Showroom)</option>
+                <option value="accountant">Accountant</option>
               </select>
             </div>
           ))

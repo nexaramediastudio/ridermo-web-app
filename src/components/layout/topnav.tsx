@@ -4,55 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import {
-  LayoutDashboard, ShoppingCart, Package, Users, UserCog,
-  Landmark, BarChart3, Settings, Bell, ChevronDown, TrendingUp,
-  Bike, Car, Wrench, Puzzle, Receipt, FileText,
-  UserCheck, Calendar, ClipboardList, DollarSign,
-  CreditCard, Hash, Wallet, LogOut, FolderOpen, Search, X,
+  Bell, ChevronDown, LogOut, Search, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { AppLogo } from "@/components/branding/app-logo";
-
-interface NavChild { label: string; href: string; icon: React.ElementType; }
-interface NavItem  { label: string; href?: string; icon: React.ElementType; children?: NavChild[]; }
-
-const NAV: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Inventory", icon: Package, children: [
-    { label: "TVS Bikes",    href: "/inventory/bikes", icon: Bike },
-    { label: "Used Bikes",   href: "/used-bikes",      icon: Car },
-    { label: "Spare Parts",  href: "/spare-parts",     icon: Wrench },
-    { label: "Accessories",  href: "/accessories",     icon: Puzzle },
-  ]},
-  { label: "Sales", icon: ShoppingCart, children: [
-    { label: "New Sale",      href: "/sales/new",      icon: ShoppingCart },
-    { label: "Sales History", href: "/sales",          icon: Receipt },
-    { label: "Invoices",      href: "/sales/invoices", icon: FileText },
-  ]},
-  { label: "Customers", icon: Users, children: [
-    { label: "All Customers", href: "/customers", icon: Users },
-    { label: "CR & Plates",     href: "/cr-plates",  icon: Hash },
-  ]},
-  { label: "Income", href: "/income", icon: TrendingUp },
-  { label: "HR", icon: UserCog, children: [
-    { label: "Employees", href: "/hr/employees", icon: UserCheck },
-    { label: "Attendance", href: "/hr/attendance", icon: Calendar },
-    { label: "Leave",      href: "/hr/leave",      icon: ClipboardList },
-    { label: "Payroll",    href: "/hr/payroll",    icon: DollarSign },
-    { label: "Payslips",   href: "/hr/payslips",   icon: Receipt },
-  ]},
-  { label: "Finance", icon: Landmark, children: [
-    { label: "Overview",             href: "/finance",       icon: Landmark },
-    { label: "Income",               href: "/income",        icon: TrendingUp },
-    { label: "TVS Cheques",          href: "/cheques/tvs",   icon: CreditCard },
-    { label: "Other Cheques",        href: "/cheques/other", icon: Wallet },
-    { label: "Expenses",             href: "/expenses",      icon: Wallet },
-  ]},
-  { label: "Reports",   href: "/reports",   icon: BarChart3 },
-  { label: "Documents", href: "/documents", icon: FolderOpen },
-  { label: "Settings",  href: "/settings",  icon: Settings },
-];
+import { useRole } from "@/components/providers/role-provider";
+import { getNavForRole, type NavItem } from "@/lib/auth/nav-by-role";
+import { roleLabel } from "@/lib/auth/roles";
 
 function isGroupActive(item: NavItem, pathname: string) {
   if (item.href) return item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
@@ -133,8 +92,17 @@ function NavButton({ item }: { item: NavItem }) {
 
 export function TopNav() {
   const router = useRouter();
+  const { role, profileName, loading } = useRole();
+  const nav = getNavForRole(role);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  const initials = (profileName || "U")
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -145,17 +113,19 @@ export function TopNav() {
 
   return (
     <header className="h-14 bg-white border-b border-[#EBEBEB] flex items-center px-6 flex-shrink-0 sticky top-0" style={{ zIndex: 1000 }}>
-      {/* Logo — left */}
       <AppLogo variant="nav" href="/dashboard" className="w-36" />
 
-      {/* Nav items — truly centered */}
       <nav className="flex-1 flex items-center justify-center gap-0.5">
-        {NAV.map(item => <NavButton key={item.label} item={item} />)}
+        {!loading && nav.map(item => <NavButton key={item.label} item={item} />)}
       </nav>
 
-      {/* Right side — fixed width to balance logo */}
-      <div className="flex items-center gap-2 flex-shrink-0 w-36 justify-end">
-        {/* Search */}
+      <div className="flex items-center gap-2 flex-shrink-0 justify-end">
+        {!loading && (
+          <span className="hidden lg:inline text-[10px] font-bold uppercase tracking-wide text-[#9A9A9A] px-2 py-1 rounded-lg bg-[#F5F5F5]">
+            {roleLabel(role)}
+          </span>
+        )}
+
         {searchOpen ? (
           <div className="flex items-center gap-2 h-8 px-3 bg-[#F5F5F5] rounded-lg border border-[#E8E8E8]">
             <Search className="h-3.5 w-3.5 text-[#9A9A9A] flex-shrink-0" />
@@ -179,7 +149,6 @@ export function TopNav() {
           </button>
         )}
 
-        {/* Notifications */}
         <Link
           href="/notifications"
           className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F5F5F5] text-[#6B6B6B] hover:text-[#0A0A0A] transition-colors relative"
@@ -188,13 +157,11 @@ export function TopNav() {
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#FF4C00]" />
         </Link>
 
-        {/* Divider */}
         <div className="w-px h-5 bg-[#EBEBEB]" />
 
-        {/* Avatar + sign out */}
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-[#FF4C00] flex items-center justify-center">
-            <span className="text-[10px] font-bold text-white">AD</span>
+            <span className="text-[10px] font-bold text-white">{initials}</span>
           </div>
           <button
             onClick={handleSignOut}

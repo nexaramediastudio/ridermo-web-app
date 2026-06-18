@@ -39,6 +39,28 @@ const SALE_FIELD_MAP: { category: CommissionCategory; field: keyof DealershipInc
   { category: "other", field: "other_earnings" },
 ];
 
+/** Collected from customer at sale — auto-counted as revenue */
+export const DEALERSHIP_EARNING_CATEGORIES: CommissionCategory[] = [
+  "transport",
+  "documentation",
+  "other",
+];
+
+/** Paid later by TVS / finance / insurance companies */
+export const EXTERNAL_COMMISSION_CATEGORIES: CommissionCategory[] = [
+  "tvs",
+  "finance",
+  "insurance",
+];
+
+export function isDealershipEarningCategory(category: CommissionCategory): boolean {
+  return DEALERSHIP_EARNING_CATEGORIES.includes(category);
+}
+
+export function isCollectedAtSale(row: { sale_id: string | null; category: CommissionCategory }): boolean {
+  return !!row.sale_id && isDealershipEarningCategory(row.category);
+}
+
 /** Potential earnings on a sale (pending + received) — NOT recognized revenue */
 export function calcPotentialIncome(sale: DealershipIncomeFields): number {
   return SALE_FIELD_MAP.reduce((sum, { field }) => sum + Number(sale[field] || 0), 0);
@@ -73,20 +95,30 @@ export function sumReceivedByCategory(
   return totals;
 }
 
-/** Create pending commission records when a sale is completed */
+/** Create commission/income records when a sale is completed */
 export async function createPendingCommissionRecords(
   supabase: SupabaseClient,
   saleId: string,
   sale: DealershipIncomeFields,
+  saleDate?: string,
 ): Promise<void> {
+  const date = saleDate || new Date().toISOString().split("T")[0];
+  const collectedAt = `${date}T12:00:00.000Z`;
+
   const rows = SALE_FIELD_MAP
-    .map(({ category, field }) => ({
-      sale_id: saleId,
-      category,
-      amount: Number(sale[field] || 0),
-      status: "pending" as const,
-    }))
-    .filter((r) => r.amount > 0);
+    .map(({ category, field }) => {
+      const amount = Number(sale[field] || 0);
+      if (amount <= 0) return null;
+      const collectedAtSale = isDealershipEarningCategory(category);
+      return {
+        sale_id: saleId,
+        category,
+        amount,
+        status: collectedAtSale ? ("received" as const) : ("pending" as const),
+        received_at: collectedAtSale ? collectedAt : null,
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
 
   if (rows.length === 0) return;
   const { error } = await supabase.from("commission_records").insert(rows);
@@ -135,11 +167,14 @@ export async function markCommissionPending(
 ): Promise<void> {
   const { data: record, error: fetchErr } = await supabase
     .from("commission_records")
-    .select("id, sale_id, status")
+    .select("id, sale_id, status, category")
     .eq("id", recordId)
     .single();
   if (fetchErr || !record) throw fetchErr || new Error("Commission record not found");
   if (record.status === "pending") return;
+  if (isCollectedAtSale(record as { sale_id: string | null; category: CommissionCategory })) {
+    throw new Error("Dealership earnings collected at sale cannot be reverted to pending");
+  }
 
   const { error: updateErr } = await supabase
     .from("commission_records")
@@ -194,4 +229,4 @@ export const INCOME_TAB_GROUPS = {
 export type IncomeTab = keyof typeof INCOME_TAB_GROUPS;
 
 export const REVENUE_RECOGNITION_NOTE =
-  "Revenue is recognized only when a commission is marked Received — not when a bike is sold.";
+  "TVS, Finance & Insurance commissions are marked Received when paid. Transport, documentation & other dealership earnings are counted as revenue automatically when the sale is completed.";

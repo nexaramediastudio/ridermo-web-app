@@ -14,6 +14,8 @@ import {
   COMMISSION_CATEGORY_LABELS,
   INCOME_TAB_GROUPS,
   REVENUE_RECOGNITION_NOTE,
+  isCollectedAtSale,
+  isDealershipEarningCategory,
   type CommissionCategory,
   type IncomeTab,
 } from "@/lib/finance/commission-records";
@@ -197,9 +199,13 @@ export function IncomePanel() {
       </div>
 
       <p className="text-xs text-[#9A9A9A]">{REVENUE_RECOGNITION_NOTE}</p>
-      {tab !== "other" && (
+      {tab === "other" ? (
+        <p className="text-xs text-[#6B6B6B] bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+          <strong>Transport, documentation &amp; other earnings</strong> from a sale are <strong>collected at the dealership</strong> and count as revenue immediately — no Received step needed.
+        </p>
+      ) : (
         <p className="text-xs text-[#6B6B6B] bg-[#F5F7FA] rounded-lg px-3 py-2">
-          <strong>{INCOME_TAB_GROUPS[tab].label}</strong> is created automatically when you complete a sale (New Sale → enter commission amounts). Mark <strong>Received</strong> when the money is actually in your account.
+          <strong>{INCOME_TAB_GROUPS[tab].label}</strong> is created when you complete a sale. Mark <strong>Received</strong> when TVS / finance / insurance actually pays you.
         </p>
       )}
 
@@ -259,6 +265,7 @@ export function IncomePanel() {
                 filtered.map((row) => {
                   const sale = resolveSale(row);
                   const busy = marking === row.id;
+                  const collectedAtSale = isCollectedAtSale(row);
                   const dateStr = row.income_date || row.received_at?.split("T")[0] || row.created_at.split("T")[0];
                   return (
                     <tr key={row.id} className="border-b border-[#F8F8F8] hover:bg-[#FAFAFA]">
@@ -276,12 +283,20 @@ export function IncomePanel() {
                       <td className="px-4 py-3 text-xs font-medium">{COMMISSION_CATEGORY_LABELS[row.category]}</td>
                       <td className="px-4 py-3 text-sm font-bold tabular-nums">Rs. {row.amount.toLocaleString()}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${row.status === "received" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                          {row.status === "received" ? "Received" : "Not Received"}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          collectedAtSale
+                            ? "bg-emerald-50 text-emerald-700"
+                            : row.status === "received"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                        }`}>
+                          {collectedAtSale ? "Collected" : row.status === "received" ? "Received" : "Not Received"}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {row.status === "pending" ? (
+                        {collectedAtSale ? (
+                          <span className="text-[10px] text-[#9A9A9A]">At sale</span>
+                        ) : row.status === "pending" ? (
                           <button onClick={() => handleMarkReceived(row.id)} disabled={busy} className="flex items-center gap-1 h-8 px-3 bg-emerald-600 text-white text-[11px] font-semibold rounded-lg disabled:opacity-60">
                             <CheckCircle2 className="h-3.5 w-3.5" />{busy ? "..." : "Received"}
                           </button>
@@ -326,7 +341,7 @@ function AddIncomeModal({
     description: "",
     amount: "",
     income_date: new Date().toISOString().split("T")[0],
-    markReceived: false,
+    markReceived: isDealershipEarningCategory(defaultCategory),
   });
   const [saving, setSaving] = useState(false);
 
@@ -373,7 +388,14 @@ function AddIncomeModal({
             <label className="r-label">Income type</label>
             <select
               value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value as CommissionCategory })}
+              onChange={(e) => {
+                const category = e.target.value as CommissionCategory;
+                setForm({
+                  ...form,
+                  category,
+                  markReceived: isDealershipEarningCategory(category) ? true : form.markReceived,
+                });
+              }}
               className="r-select w-full"
             >
               {categoryOptions.map((c) => (
