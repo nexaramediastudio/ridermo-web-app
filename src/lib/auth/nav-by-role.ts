@@ -28,7 +28,6 @@ const FULL_NAV: NavItem[] = [
     { label: "All Customers", href: "/customers", icon: Users },
     { label: "CR & Plates", href: "/cr-plates", icon: Hash },
   ]},
-  { label: "Income", href: "/income", icon: TrendingUp },
   { label: "HR", icon: UserCog, children: [
     { label: "Employees", href: "/hr/employees", icon: UserCheck },
     { label: "Attendance", href: "/hr/attendance", icon: Calendar },
