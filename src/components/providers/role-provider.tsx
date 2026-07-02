@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeRole, type AppRole } from "@/lib/auth/roles";
 
@@ -32,9 +32,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [profileName, setProfileName] = useState<string | null>(null);
+  const bootedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    const isInitial = !bootedRef.current;
+    if (isInitial) setLoading(true);
+
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -42,6 +45,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       setRole("worker");
       setEmployeeId(null);
       setProfileName(null);
+      bootedRef.current = true;
       setLoading(false);
       return;
     }
@@ -77,6 +81,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       .maybeSingle();
 
     setEmployeeId(employee?.id ?? null);
+    bootedRef.current = true;
     setLoading(false);
   }, []);
 
@@ -85,18 +90,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION" || event === "USER_UPDATED") {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
         refresh();
       }
     });
 
-    const onFocus = () => refresh();
-    window.addEventListener("focus", onFocus);
-
-    return () => {
-      subscription.unsubscribe();
-      window.removeEventListener("focus", onFocus);
-    };
+    return () => subscription.unsubscribe();
   }, [refresh]);
 
   return (

@@ -106,9 +106,9 @@ export function TopNav() {
 
   async function handleSignOut() {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "global" });
     toast.success("Signed out");
-    router.push("/login");
+    router.replace("/login");
   }
 
   return (

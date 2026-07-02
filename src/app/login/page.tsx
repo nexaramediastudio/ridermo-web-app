@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { AppLogo } from "@/components/branding/app-logo";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,6 +17,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const supabase = createClient();
+    await supabase.auth.signOut({ scope: "global" });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
@@ -23,7 +26,7 @@ export default function LoginPage() {
       return;
     }
 
-    window.location.href = "/dashboard";
+    router.replace("/dashboard");
   }
 
   return (
