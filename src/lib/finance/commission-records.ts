@@ -114,6 +114,7 @@ export async function createPendingCommissionRecords(
         sale_id: saleId,
         category,
         amount,
+        income_date: date,
         status: collectedAtSale ? ("received" as const) : ("pending" as const),
         received_at: collectedAtSale ? collectedAt : null,
       };

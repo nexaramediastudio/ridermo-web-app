@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Bike, User, CreditCard, CheckCircle2, ChevronRight,
-  Search, X, Plus, Building2, Shield, AlertCircle, ArrowLeft,
+  Search, X, Plus, Building2, Shield, AlertCircle, ArrowLeft, Calendar,
 } from "lucide-react";
 import { calcDealershipIncome } from "@/lib/finance/dealership-income";
 import { createPendingCommissionRecords } from "@/lib/finance/commission-records";
@@ -39,6 +39,22 @@ interface CustomerOption {
   full_name: string;
   phone?: string;
   nic?: string;
+}
+
+function localISODate(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatSaleDate(iso: string) {
+  if (!iso) return "—";
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 const STEPS = [
@@ -90,6 +106,7 @@ export default function NewSalePage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [saleDate, setSaleDate] = useState(localISODate);
 
   const [bikeSearch, setBikeSearch]     = useState("");
   const [bikes, setBikes]               = useState<StockBike[]>([]);
@@ -185,6 +202,7 @@ export default function NewSalePage() {
         .from("sales")
         .insert({
           invoice_number: invoiceNumber,
+          sale_date: saleDate,
           bike_id: selectedBike!.id,
           customer_id: customerId,
           selling_price: finalPrice,
@@ -212,7 +230,6 @@ export default function NewSalePage() {
       await supabase.from("cr_number_plates").insert({ sale_id: sale.id, bike_id: selectedBike!.id, customer_id: customerId, cr_status: "pending", plate_status: "pending" });
 
       // ── Commission records: dealership earnings auto-received; external commissions pending ──
-      const saleDateStr = new Date().toISOString().split("T")[0];
       await createPendingCommissionRecords(supabase, sale.id, {
         tvs_commission: parseFloat(tvsCommission) || 0,
         finance_commission: parseFloat(finance.commission) || 0,
@@ -220,10 +237,10 @@ export default function NewSalePage() {
         transport_charges: parseFloat(transportCharges) || 0,
         documentation_charges: parseFloat(documentationCharges) || 0,
         other_earnings: parseFloat(otherEarnings) || 0,
-      }, saleDateStr);
+      }, saleDate);
 
       // ── Worker commissions (synced from attendance for sale date) ──
-      await syncWorkerCommissionsForDate(supabase, saleDateStr);
+      await syncWorkerCommissionsForDate(supabase, saleDate);
 
       toast.success(`Sale completed! Invoice: ${invoiceNumber}. Dealership earnings added to revenue.`);
       router.push(`/sales`);
@@ -238,6 +255,17 @@ export default function NewSalePage() {
     return (
       <div className="r-card p-5 space-y-4 sticky top-4">
         <p className="text-[11px] font-bold text-[#9A9A9A] uppercase tracking-wider">Sale Summary</p>
+
+        {/* Sale date */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-bold text-[#ABABAB] uppercase tracking-wider">Sale Date</p>
+          <div className="p-3 bg-[#F5F5F5] rounded-xl">
+            <p className="text-[12px] font-bold text-[#0A0A0A]">{formatSaleDate(saleDate)}</p>
+            {saleDate !== localISODate() && (
+              <p className="text-[10px] text-[#FF4C00] mt-0.5">Backdated sale</p>
+            )}
+          </div>
+        </div>
 
         {/* Bike */}
         <div className="space-y-1.5">
@@ -310,16 +338,30 @@ export default function NewSalePage() {
   return (
     <div className="space-y-5">
       {/* Page header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.back()}
-          className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E8E8E8] hover:bg-[#F5F5F5] transition-all flex-shrink-0"
-        >
-          <ArrowLeft className="h-3.5 w-3.5 text-[#6B6B6B]" />
-        </button>
-        <div>
-          <h1 className="r-page-title">New Sale</h1>
-          <p className="r-page-sub">Complete the sale step by step</p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => router.back()}
+            className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E8E8E8] hover:bg-[#F5F5F5] transition-all flex-shrink-0"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 text-[#6B6B6B]" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="r-page-title">New Sale</h1>
+            <p className="r-page-sub">Complete the sale step by step — pick an earlier date to enter a past sale</p>
+          </div>
+        </div>
+        <div className="flex-shrink-0">
+          <label className="r-label flex items-center gap-1.5">
+            <Calendar className="h-3 w-3" /> Sale Date
+          </label>
+          <input
+            type="date"
+            value={saleDate}
+            max={localISODate()}
+            onChange={(e) => setSaleDate(e.target.value || localISODate())}
+            className="r-input w-[160px]"
+          />
         </div>
       </div>
 
@@ -691,6 +733,21 @@ export default function NewSalePage() {
               </div>
 
               {/* Detail rows */}
+              <div className="p-4 bg-[#FAFAFA] rounded-xl">
+                <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider mb-2">Sale Date</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-[#FF4C00]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Calendar className="h-4 w-4 text-[#FF4C00]" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-[#0A0A0A]">{formatSaleDate(saleDate)}</p>
+                    <p className="text-[11px] text-[#9A9A9A]">
+                      {saleDate === localISODate() ? "Today" : "Previous sale — recorded on this date"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-[#FAFAFA] rounded-xl">
                   <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider mb-2">Bike</p>
