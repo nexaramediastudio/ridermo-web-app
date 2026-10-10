@@ -48,7 +48,7 @@ export function PayslipDetail({
   const earnedLabel =
     emp.salary_type === "hourly"
       ? `Basic (${(p.hours_worked ?? 0).toFixed(1)} hrs)`
-      : `Earned basic (${p.present_days}/${p.working_days} days)`;
+      : `Earned basic (${p.present_days} paid / ${p.working_days} days)`;
 
   return (
     <div className="space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto pr-1">
@@ -87,7 +87,7 @@ export function PayslipDetail({
         <p className="text-[10px] font-bold text-[#9A9A9A] uppercase mb-2">Attendance</p>
         <div className="bg-white border border-[#E8E8E8] rounded-xl px-3 py-1">
           <Line label="Working days" value={String(p.working_days)} />
-          <Line label="Present" value={String(p.present_days)} />
+          <Line label="Paid days" value={String(p.present_days)} />
           <Line label="Absent" value={String(p.absent_days)} />
           {emp.salary_type === "hourly" && (
             <Line label="Hours worked" value={`${(p.hours_worked ?? 0).toFixed(1)} hrs`} />

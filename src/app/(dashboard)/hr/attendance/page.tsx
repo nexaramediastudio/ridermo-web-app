@@ -21,9 +21,11 @@ interface Employee {
 interface AttendanceRecord {
   employee_id: string;
   status: AttendanceStatus | null;
+  is_holiday?: boolean;
   check_in?: string;
   check_out?: string;
   ot_hours?: number;
+  late_hours?: number;
 }
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string; icon: React.ElementType; color: string; bg: string }[] = [
@@ -32,7 +34,6 @@ const STATUS_OPTIONS: { value: AttendanceStatus; label: string; icon: React.Elem
   { value: "half_day", label: "Half Day", icon: Clock, color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
   { value: "sick_leave", label: "Sick Leave", icon: Stethoscope, color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
   { value: "casual_leave", label: "Casual Leave", icon: Umbrella, color: "text-purple-700", bg: "bg-purple-50 border-purple-200" },
-  { value: "holiday", label: "Holiday", icon: Sun, color: "text-orange-700", bg: "bg-orange-50 border-orange-200" },
 ];
 
 export default function AttendancePage() {
@@ -72,12 +73,14 @@ export default function AttendancePage() {
       attMap[emp.id] = existing
         ? {
             employee_id: emp.id,
-            status: existing.status as AttendanceStatus,
+            status: existing.status === "holiday" ? null : (existing.status as AttendanceStatus),
+            is_holiday: Boolean(existing.is_holiday) || existing.status === "holiday",
             check_in: existing.check_in,
             check_out: existing.check_out,
             ot_hours: existing.ot_hours,
+            late_hours: existing.late_hours,
           }
-        : { employee_id: emp.id, status: null };
+        : { employee_id: emp.id, status: null, is_holiday: false };
     });
     setAttendance(attMap);
     setLoading(false);
@@ -90,14 +93,22 @@ export default function AttendancePage() {
     setDraftIds((prev) => new Set(prev).add(empId));
   }
 
+  function toggleHoliday(empId: string) {
+    setAttendance((prev) => ({
+      ...prev,
+      [empId]: { ...prev[empId], is_holiday: !prev[empId]?.is_holiday },
+    }));
+    setDraftIds((prev) => new Set(prev).add(empId));
+  }
+
   function clearMark(empId: string) {
-    setAttendance((prev) => ({ ...prev, [empId]: { ...prev[empId], status: null, ot_hours: 0 } }));
+    setAttendance((prev) => ({ ...prev, [empId]: { ...prev[empId], status: null, is_holiday: false, ot_hours: 0, late_hours: 0 } }));
     setDraftIds((prev) => new Set(prev).add(empId));
   }
 
   function isMarked(empId: string) {
     const rec = attendance[empId];
-    return rec?.status != null;
+    return rec?.status != null || !!rec?.is_holiday;
   }
 
   function markState(empId: string): "saved" | "draft" | "not_marked" {
@@ -118,19 +129,32 @@ export default function AttendancePage() {
     setDraftIds(nextDraft);
   }
 
+  function markAllHoliday() {
+    const updated = { ...attendance };
+    const nextDraft = new Set(draftIds);
+    Object.keys(updated).forEach((id) => {
+      updated[id] = { ...updated[id], is_holiday: true };
+      nextDraft.add(id);
+    });
+    setAttendance(updated);
+    setDraftIds(nextDraft);
+  }
+
   async function handleSave() {
     setSaving(true);
     const supabase = createClient();
 
     const records = Object.values(attendance)
-      .filter((rec) => rec.status != null)
+      .filter((rec) => rec.status != null || rec.is_holiday)
       .map((rec) => ({
         employee_id: rec.employee_id,
         date: selectedDate,
-        status: rec.status!,
+        status: rec.status ?? "holiday",
+        is_holiday: !!rec.is_holiday,
         check_in: rec.check_in || null,
         check_out: rec.check_out || null,
-        ot_hours: rec.ot_hours || 0,
+        ot_hours: rec.status === "present" ? rec.ot_hours || 0 : 0,
+        late_hours: rec.status === "present" || rec.status === "half_day" ? rec.late_hours || 0 : 0,
       }));
 
     if (records.length === 0) {
@@ -195,7 +219,8 @@ export default function AttendancePage() {
     absent: Object.values(attendance).filter((a) => a.status === "absent").length,
     half_day: Object.values(attendance).filter((a) => a.status === "half_day").length,
     leave: Object.values(attendance).filter((a) => a.status != null && ["sick_leave", "casual_leave"].includes(a.status)).length,
-    holiday: Object.values(attendance).filter((a) => a.status === "holiday").length,
+    holiday: Object.values(attendance).filter((a) => a.is_holiday).length,
+    ot: Object.values(attendance).reduce((sum, a) => sum + (Number(a.ot_hours) || 0), 0),
   };
 
   const dateDisplay = new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
@@ -257,8 +282,10 @@ export default function AttendancePage() {
             { label: "Absent",   value: counts.absent,   cls: "r-badge-red" },
             { label: "Half Day", value: counts.half_day, cls: "r-badge-amber" },
             { label: "Leave",    value: counts.leave,    cls: "r-badge-blue" },
+            { label: "Holiday",  value: counts.holiday, cls: "r-badge-amber" },
+            { label: "OT hrs",   value: counts.ot,      cls: "r-badge-amber" },
           ].map(({ label, value, cls }) => value > 0 ? (
-            <span key={label} className={`${cls} text-[11px] font-bold`}>{value} {label}</span>
+            <span key={label} className={`${cls} text-[11px] font-bold`}>{Number.isInteger(value) ? value : value.toFixed(1)} {label}</span>
           ) : null)}
         </div>
       </div>
@@ -315,7 +342,16 @@ export default function AttendancePage() {
             {s.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={markAllHoliday}
+          className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-[11px] font-semibold border transition-all hover:opacity-80 bg-orange-50 border-orange-200 text-orange-700"
+        >
+          <Sun className="h-3 w-3" />
+          Holiday
+        </button>
       </div>
+      <p className="text-[11px] text-[#9A9A9A] -mt-3">Holiday can be marked with Present. The holiday day rate is added only when Present is selected.</p>
 
       {/* Attendance List */}
       <div className="r-card overflow-hidden">
@@ -341,7 +377,7 @@ export default function AttendancePage() {
             <div className="hidden sm:grid grid-cols-[140px_1fr_auto] gap-4 px-5 py-2 bg-[#FAFAFA] border-b border-[#F0F0F0]">
               <span className="text-[10px] font-bold text-[#9A9A9A] uppercase">Marked?</span>
               <span className="text-[10px] font-bold text-[#9A9A9A] uppercase">Employee &amp; Status</span>
-              <span className="text-[10px] font-bold text-[#9A9A9A] uppercase text-right">OT</span>
+              <span className="text-[10px] font-bold text-[#9A9A9A] uppercase text-right">Late / OT</span>
             </div>
             {employees.map((emp) => {
               const rec = attendance[emp.id];
@@ -399,12 +435,44 @@ export default function AttendancePage() {
                         {s.label}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => toggleHoliday(emp.id)}
+                      className={`flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all whitespace-nowrap ${
+                        rec?.is_holiday
+                          ? "bg-orange-50 border-orange-200 text-orange-700"
+                          : "border-[#E8E8E8] text-[#9A9A9A] hover:text-[#0A0A0A] hover:bg-[#F5F5F5] hover:border-[#D0D0D0]"
+                      }`}
+                    >
+                      <Sun className="h-3.5 w-3.5 flex-shrink-0" />
+                      Holiday
+                    </button>
                   </div>
                   </div>
 
-                  {currentStatus === "present" && (
+                  {(currentStatus === "present" || currentStatus === "half_day") && (
                     <div className="flex items-center gap-1.5 flex-shrink-0 sm:ml-auto pl-[152px] sm:pl-0">
-                      <span className="text-[11px] text-[#9A9A9A] font-medium">OT</span>
+                      <span className="text-[11px] text-[#9A9A9A] font-medium">Late</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="8"
+                        step="1"
+                        value={rec?.late_hours || ""}
+                        onChange={(e) => {
+                          setDraftIds((prev) => new Set(prev).add(emp.id));
+                          setAttendance((prev) => ({
+                            ...prev,
+                            [emp.id]: { ...prev[emp.id], late_hours: parseFloat(e.target.value) || 0 },
+                          }));
+                        }}
+                        placeholder="0"
+                        className="w-14 h-7 px-2 rounded-lg border border-[#E8E8E8] text-[11px] text-center focus:outline-none focus:border-[#FF4C00]"
+                      />
+                      <span className="text-[11px] text-[#9A9A9A]">hrs</span>
+                      {currentStatus === "present" && (
+                        <>
+                      <span className="text-[11px] text-[#9A9A9A] font-medium ml-2">OT</span>
                       <input
                         type="number"
                         min="0"
@@ -422,6 +490,8 @@ export default function AttendancePage() {
                         className="w-14 h-7 px-2 rounded-lg border border-[#E8E8E8] text-[11px] text-center focus:outline-none focus:border-[#FF4C00]"
                       />
                       <span className="text-[11px] text-[#9A9A9A]">hrs</span>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

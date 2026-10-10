@@ -11,7 +11,7 @@ import {
 import { printPayslip, type PayslipData } from "@/lib/hr/payslip-print";
 import { PayslipDetail } from "@/components/hr/payslip-detail";
 import { syncWorkerCommissionsForMonth } from "@/lib/hr/worker-commissions";
-import { calculatePayroll, summarizeAttendance } from "@/lib/hr/payroll-calc";
+import { calculatePayroll, calcHoursWorked, summarizeAttendance } from "@/lib/hr/payroll-calc";
 
 interface PayslipRow {
   id: string;
@@ -133,18 +133,18 @@ export default function PayslipsPage() {
     if (rows.length) {
       const { data: att } = await supabase
         .from("attendance")
-        .select("employee_id, status, ot_hours")
+        .select("employee_id, status, ot_hours, late_hours, date, is_holiday")
         .gte("date", monthStart)
         .lt("date", monthEnd);
       const hMap: Record<string, number> = {};
-      const byEmp: Record<string, { status: string; ot_hours?: number | null }[]> = {};
+      const byEmp: Record<string, { status: string; ot_hours?: number | null; late_hours?: number | null; date?: string | null; is_holiday?: boolean | null }[]> = {};
       (att || []).forEach((r) => {
         if (!byEmp[r.employee_id]) byEmp[r.employee_id] = [];
         byEmp[r.employee_id].push(r);
       });
       rows.forEach((p) => {
         const s = summarizeAttendance(byEmp[p.employee_id] || []);
-        hMap[p.employee_id] = s.present * 8 + s.otHours;
+        hMap[p.employee_id] = calcHoursWorked(s);
       });
       setHoursMap(hMap);
     } else {
@@ -170,12 +170,12 @@ export default function PayslipsPage() {
           .from("employees")
           .select("id, type, basic_salary, hourly_rate, salary_type, has_epf, has_etf")
           .eq("is_active", true),
-        supabase.from("attendance").select("employee_id, status, ot_hours").gte("date", monthStart).lt("date", monthEnd),
+        supabase.from("attendance").select("employee_id, status, ot_hours, late_hours, date, is_holiday").gte("date", monthStart).lt("date", monthEnd),
         supabase.from("worker_commissions").select("employee_id, amount").gte("sale_date", monthStart).lt("sale_date", monthEnd),
       ]);
 
       const emps = empRes.data || [];
-      const attByEmp: Record<string, { status: string; ot_hours?: number | null }[]> = {};
+      const attByEmp: Record<string, { status: string; ot_hours?: number | null; late_hours?: number | null; date?: string | null; is_holiday?: boolean | null }[]> = {};
       (attRes.data || []).forEach((r) => {
         if (!attByEmp[r.employee_id]) attByEmp[r.employee_id] = [];
         attByEmp[r.employee_id].push(r);
@@ -201,7 +201,7 @@ export default function PayslipsPage() {
           year,
           basic_salary: calc.earnedBasic,
           attendance_bonus: 0,
-          ot_pay: 0,
+          ot_pay: calc.otPay,
           bike_commission: calc.bikeCommission,
           bonus: 0,
           gross_salary: calc.gross,

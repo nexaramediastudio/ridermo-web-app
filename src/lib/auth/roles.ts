@@ -35,6 +35,7 @@ const ACCOUNTANT_PREFIXES = [
   "/hr/payroll",
   "/hr/payslips",
   "/hr/leave",
+  "/hr/commissions",
   "/sales",
   "/reports",
   "/documents",
@@ -53,6 +54,7 @@ const WORKER_BLOCKED_PREFIXES = [
   "/hr/payroll",
   "/hr/payslips",
   "/hr/leave",
+  "/hr/commissions",
 ];
 
 const ACCOUNTANT_BLOCKED_PREFIXES = [

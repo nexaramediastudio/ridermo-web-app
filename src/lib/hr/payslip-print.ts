@@ -96,8 +96,8 @@ export function buildPayslipHtml(data: PayslipData): string {
 
   const earnedLabel =
     emp.salary_type === "hourly"
-      ? `Basic pay (${(p.hours_worked ?? 0).toFixed(1)} hours)`
-      : `Earned basic (${p.present_days} / ${p.working_days} days)`;
+      ? "Basic pay"
+      : `Earned basic (${p.present_days} paid / ${p.working_days} days)`;
 
   const totalEarnings =
     p.basic_salary +
@@ -215,7 +215,7 @@ export function buildPayslipHtml(data: PayslipData): string {
         ${grid2(
           [
             ["Standard working days", String(p.working_days)],
-            ["Days present", String(p.present_days)],
+            ["Paid days", String(p.present_days)],
             ["Days absent", String(p.absent_days)],
             emp.salary_type === "hourly"
               ? ["Total hours worked", `${(p.hours_worked ?? 0).toFixed(1)} hrs`]

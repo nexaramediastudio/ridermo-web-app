@@ -379,6 +379,8 @@ CREATE TABLE IF NOT EXISTS public.attendance (
   check_in TIME,
   check_out TIME,
   ot_hours DECIMAL(4, 2) DEFAULT 0,
+  late_hours DECIMAL(4, 2) NOT NULL DEFAULT 0,
+  is_holiday BOOLEAN NOT NULL DEFAULT false,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(employee_id, date)

@@ -32,6 +32,7 @@ const FULL_NAV: NavItem[] = [
     { label: "Employees", href: "/hr/employees", icon: UserCheck },
     { label: "Attendance", href: "/hr/attendance", icon: Calendar },
     { label: "Leave", href: "/hr/leave", icon: ClipboardList },
+    { label: "Worker Commissions", href: "/hr/commissions", icon: Bike },
     { label: "Payroll", href: "/hr/payroll", icon: DollarSign },
     { label: "Payslips", href: "/hr/payslips", icon: Receipt },
   ]},
@@ -82,6 +83,7 @@ const ACCOUNTANT_NAV: NavItem[] = [
     { label: "Payroll", href: "/hr/payroll", icon: DollarSign },
     { label: "Payslips", href: "/hr/payslips", icon: Receipt },
     { label: "Leave", href: "/hr/leave", icon: ClipboardList },
+    { label: "Worker Commissions", href: "/hr/commissions", icon: Bike },
   ]},
   { label: "Sales", icon: ShoppingCart, children: [
     { label: "Sales History", href: "/sales", icon: Receipt },

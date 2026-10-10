@@ -5,10 +5,10 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, DollarSign, Users,
-  CheckCircle2, AlertCircle, RefreshCw,
+  CheckCircle2, AlertCircle, RefreshCw, Clock,
 } from "lucide-react";
 import { syncWorkerCommissionsForMonth } from "@/lib/hr/worker-commissions";
-import { calculatePayroll, summarizeAttendance } from "@/lib/hr/payroll-calc";
+import { calculatePayroll, summarizeAttendance, SUNDAY_HOLIDAY_DAY_PAY } from "@/lib/hr/payroll-calc";
 
 interface Employee {
   id: string;
@@ -21,6 +21,7 @@ interface Employee {
   has_epf: boolean;
   has_etf: boolean;
   is_active: boolean;
+  per_bike_commission?: number;
 }
 
 interface PayrollEntry {
@@ -41,8 +42,14 @@ interface PayrollEntry {
   net_salary: number;
   working_days: number;
   present_days: number;
+  worked_days?: number;
+  leave_days?: number;
+  sunday_holiday_days?: number;
   absent_days: number;
   hours_worked?: number;
+  ot_hours?: number;
+  late_hours?: number;
+  late_deduction?: number;
   status: "draft" | "approved" | "paid";
 }
 
@@ -60,6 +67,7 @@ export default function PayrollPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payroll, setPayroll] = useState<Record<string, PayrollEntry>>({});
+  const [bikeCounts, setBikeCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -74,9 +82,9 @@ export default function PayrollPage() {
     await syncWorkerCommissionsForMonth(supabase, year, month);
 
     const [empRes, payRes, attRes, commRes] = await Promise.all([
-      supabase.from("employees").select("id, full_name, type, employee_code, basic_salary, hourly_rate, salary_type, has_epf, has_etf, is_active").eq("is_active", true).order("full_name"),
+      supabase.from("employees").select("id, full_name, type, employee_code, basic_salary, hourly_rate, salary_type, has_epf, has_etf, is_active, per_bike_commission").eq("is_active", true).order("full_name"),
       supabase.from("payroll").select("*").eq("month", month).eq("year", year),
-      supabase.from("attendance").select("employee_id, status, ot_hours").gte("date", monthStart).lt("date", monthEnd),
+      supabase.from("attendance").select("employee_id, status, ot_hours, late_hours, date, is_holiday").gte("date", monthStart).lt("date", monthEnd),
       // All bike commissions for sales in this month — salary, not tied to dealership commission received
       supabase
         .from("worker_commissions")
@@ -90,16 +98,19 @@ export default function PayrollPage() {
     const attRecords = attRes.data || [];
     const commRecords = commRes.data || [];
 
-    const attByEmp: Record<string, { status: string; ot_hours?: number | null }[]> = {};
+    const attByEmp: Record<string, { status: string; ot_hours?: number | null; late_hours?: number | null; date?: string | null; is_holiday?: boolean | null }[]> = {};
     attRecords.forEach((rec) => {
       if (!attByEmp[rec.employee_id]) attByEmp[rec.employee_id] = [];
       attByEmp[rec.employee_id].push(rec);
     });
 
     const commTotals: Record<string, number> = {};
+    const counts: Record<string, number> = {};
     commRecords.forEach((c) => {
       commTotals[c.employee_id] = (commTotals[c.employee_id] || 0) + Number(c.amount);
+      counts[c.employee_id] = (counts[c.employee_id] || 0) + 1;
     });
+    setBikeCounts(counts);
 
     setEmployees(emps);
 
@@ -117,7 +128,6 @@ export default function PayrollPage() {
         attendance: attSummary,
         bikeCommission: emp.type === "worker" ? commTotals[emp.id] || 0 : 0,
         attendanceBonus: existing?.attendance_bonus ?? 0,
-        otPay: existing?.ot_pay ?? 0,
         bonus: existing?.bonus ?? 0,
         otherDeductions: existing?.other_deductions ?? 0,
       });
@@ -129,7 +139,7 @@ export default function PayrollPage() {
         year,
         basic_salary: calc.earnedBasic,
         attendance_bonus: existing?.attendance_bonus ?? 0,
-        ot_pay: existing?.ot_pay ?? 0,
+        ot_pay: calc.otPay,
         bike_commission: calc.bikeCommission,
         bonus: existing?.bonus ?? 0,
         gross_salary: calc.gross,
@@ -140,8 +150,14 @@ export default function PayrollPage() {
         net_salary: calc.net,
         working_days: calc.workingDays,
         present_days: calc.presentDays,
+        worked_days: calc.workedDays,
+        leave_days: calc.leaveDays,
+        sunday_holiday_days: calc.sundayHolidayDays,
         absent_days: calc.absentDays,
         hours_worked: calc.hoursWorked,
+        ot_hours: attSummary.otHours,
+        late_hours: calc.lateHours,
+        late_deduction: calc.lateDeduction,
         status: existing?.status ?? "draft",
       };
     });
@@ -168,7 +184,7 @@ export default function PayrollPage() {
   async function handleSaveAll() {
     setSaving(true);
     const supabase = createClient();
-    const records = Object.values(payroll).map(({ hours_worked: _h, ...p }) => p);
+    const records = Object.values(payroll).map(({ hours_worked: _h, ot_hours: _ot, late_hours: _lh, late_deduction: _ld, worked_days: _w, leave_days: _l, sunday_holiday_days: _s, ...p }) => p);
     const { error } = await supabase.from("payroll").upsert(records, { onConflict: "employee_id,month,year" });
     if (error) toast.error(error.message);
     else { toast.success("Payroll saved"); loadPayroll(); }
@@ -193,7 +209,14 @@ export default function PayrollPage() {
 
   const totalNet = Object.values(payroll).reduce((sum, p) => sum + p.net_salary, 0);
   const totalGross = Object.values(payroll).reduce((sum, p) => sum + p.gross_salary, 0);
+  const totalOtHours = Object.values(payroll).reduce((sum, p) => sum + (p.ot_hours || 0), 0);
+  const totalOtPay = Object.values(payroll).reduce((sum, p) => sum + (p.ot_pay || 0), 0);
   const paidCount = Object.values(payroll).filter((p) => p.status === "paid").length;
+
+  function formatOt(hours: number) {
+    const rounded = Math.round(hours * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  }
 
   return (
     <div className="space-y-5">
@@ -220,7 +243,7 @@ export default function PayrollPage() {
       </div>
 
       {/* Month selector + summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-2xl border border-[#EFEFEF] p-4 flex items-center gap-3">
           <button onClick={() => changeMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#E5E5E5] hover:bg-[#F5F5F5]">
             <ChevronLeft className="h-4 w-4 text-[#6B6B6B]" />
@@ -238,8 +261,9 @@ export default function PayrollPage() {
         {[
           { label: "Total Gross", value: `Rs. ${totalGross.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: DollarSign, accent: false },
           { label: "Total Net Payable", value: `Rs. ${totalNet.toLocaleString("en", { maximumFractionDigits: 0 })}`, icon: DollarSign, accent: true },
+          { label: "Total OT", value: `Rs. ${totalOtPay.toLocaleString("en", { maximumFractionDigits: 0 })}`, hint: `${formatOt(totalOtHours)} hrs`, icon: Clock, accent: false },
           { label: "Paid", value: `${paidCount} / ${employees.length}`, icon: CheckCircle2, accent: false },
-        ].map(({ label, value, icon: Icon, accent }) => (
+        ].map(({ label, value, hint, icon: Icon, accent }) => (
           <div key={label} className={`bg-white rounded-2xl border p-4 ${accent ? "border-[#FF4C00]/20" : "border-[#EFEFEF]"}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-[#8A8A8A] uppercase tracking-wider">{label}</span>
@@ -250,6 +274,7 @@ export default function PayrollPage() {
             <p className={`text-lg font-bold ${accent ? "text-[#FF4C00]" : "text-[#0A0A0A]"}`} style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
               {value}
             </p>
+            {hint && <p className="text-[11px] text-[#9A9A9A] mt-0.5">{hint}</p>}
           </div>
         ))}
       </div>
@@ -306,10 +331,30 @@ export default function PayrollPage() {
                       {/* Attendance */}
                       <td className="px-4 py-3">
                         <div className="text-xs">
-                          <span className="text-emerald-600 font-semibold">{entry.present_days}P</span>
+                          <span className="text-emerald-600 font-semibold">{entry.worked_days ?? entry.present_days}P</span>
+                          {(entry.leave_days || 0) > 0 && (
+                            <>
+                              <span className="text-[#9A9A9A] mx-1">/</span>
+                              <span className="text-blue-600 font-semibold">{entry.leave_days}L</span>
+                            </>
+                          )}
                           <span className="text-[#9A9A9A] mx-1">/</span>
                           <span className="text-red-500 font-semibold">{entry.absent_days}A</span>
-                          <p className="text-[#9A9A9A] mt-0.5">of {entry.working_days} days</p>
+                          <p className="text-[#9A9A9A] mt-0.5">{entry.present_days}/{entry.working_days} paid days</p>
+                          {(entry.sunday_holiday_days || 0) > 0 && (
+                            <p className="text-orange-700 font-semibold mt-0.5">
+                              {entry.sunday_holiday_days} Sun/holiday × Rs. {SUNDAY_HOLIDAY_DAY_PAY.toLocaleString()}
+                            </p>
+                          )}
+                          <p className="text-amber-700 font-semibold mt-0.5">
+                            {formatOt(entry.ot_hours || 0)} OT hrs
+                            {(entry.ot_pay || 0) > 0 ? ` · Rs. ${entry.ot_pay.toLocaleString("en", { maximumFractionDigits: 0 })}` : ""}
+                          </p>
+                          {(entry.late_hours || 0) > 0 && (
+                            <p className="text-red-600 font-semibold mt-0.5">
+                              Late {formatOt(entry.late_hours || 0)} hr · − Rs. {(entry.late_deduction || 0).toLocaleString("en", { maximumFractionDigits: 0 })}
+                            </p>
+                          )}
                         </div>
                       </td>
                       {/* Basic (Earned) */}
@@ -319,7 +364,17 @@ export default function PayrollPage() {
                         </span>
                         {entry.present_days < entry.working_days && (
                           <p className="text-[10px] text-[#9A9A9A] mt-0.5">
-                            {entry.present_days}/{entry.working_days} days
+                            {entry.present_days}/{entry.working_days} paid days
+                          </p>
+                        )}
+                        {(entry.sunday_holiday_days || 0) > 0 && (
+                          <p className="text-[10px] text-orange-700 mt-0.5">
+                            + {entry.sunday_holiday_days} × Rs. {SUNDAY_HOLIDAY_DAY_PAY.toLocaleString()}
+                          </p>
+                        )}
+                        {(entry.late_hours || 0) > 0 && (
+                          <p className="text-[10px] text-red-600 mt-0.5">
+                            − {formatOt(entry.late_hours || 0)} hr late
                           </p>
                         )}
                       </td>
@@ -340,7 +395,8 @@ export default function PayrollPage() {
                             </span>
                             {emp.type === "worker" && (
                               <p className="text-[9px] font-bold text-amber-600 uppercase tracking-wide mt-0.5">
-                                per bike sold
+                                {bikeCounts[emp.id] || 0} bike{(bikeCounts[emp.id] || 0) === 1 ? "" : "s"}
+                                {emp.per_bike_commission ? ` × Rs. ${Number(emp.per_bike_commission).toLocaleString()}` : ""}
                               </p>
                             )}
                           </div>
@@ -359,18 +415,27 @@ export default function PayrollPage() {
                               placeholder="Bonus"
                               className="w-24 h-8 px-2 rounded-xl border border-[#E5E5E5] text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]"
                             />
-                            <input
-                              type="number"
-                              value={entry.ot_pay || ""}
-                              onChange={(e) => recalculate(emp.id, { ot_pay: parseFloat(e.target.value) || 0 })}
-                              placeholder="OT Pay"
-                              className="w-24 h-8 px-2 rounded-xl border border-[#E5E5E5] text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00]"
-                            />
+                            <p className="text-[11px] font-semibold text-amber-700">
+                              OT Rs. {(entry.ot_pay || 0).toLocaleString("en", { maximumFractionDigits: 0 })}
+                            </p>
+                            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">
+                              {formatOt(entry.ot_hours || 0)} hrs
+                            </p>
                           </div>
                         ) : (
-                          <span className="text-sm text-[#4A4A4A]">
-                            {(entry.bonus + entry.ot_pay) > 0 ? `Rs. ${(entry.bonus + entry.ot_pay).toLocaleString("en", { maximumFractionDigits: 0 })}` : "—"}
-                          </span>
+                          <div>
+                            <span className="text-sm font-semibold text-amber-700">
+                              {(entry.ot_pay || 0) > 0 ? `Rs. ${entry.ot_pay.toLocaleString("en", { maximumFractionDigits: 0 })}` : "—"}
+                            </span>
+                            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mt-0.5">
+                              {formatOt(entry.ot_hours || 0)} OT hrs
+                            </p>
+                            {(entry.bonus || 0) > 0 && (
+                              <p className="text-[10px] text-[#6B6B6B] mt-0.5">
+                                Bonus Rs. {entry.bonus.toLocaleString("en", { maximumFractionDigits: 0 })}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </td>
                       {/* Gross */}
@@ -433,12 +498,16 @@ export default function PayrollPage() {
         <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
         <div className="text-xs text-amber-700 space-y-1">
           <p className="font-semibold">Payroll Rules Applied:</p>
-          <p>• <strong>Earned Basic</strong> = Full Basic Salary × (Days Present ÷ 26 working days)</p>
+          <p>• <strong>Earned Basic</strong> = basic ÷ 26 × paid days. Paid days = days worked (half day = 0.5) + sick leave + casual leave</p>
+          <p>• A <strong>Sunday</strong>, or a day marked <strong>Holiday</strong>, is paid at Rs. {SUNDAY_HOLIDAY_DAY_PAY.toLocaleString()} only when <strong>Present</strong> is also selected. Holiday alone is not added to salary</p>
+          <p>• Salary is reduced only for days marked <strong>Absent</strong>. Sick leave and casual leave are paid</p>
           <p>• Workers: EPF 8% + ETF 3% deducted from gross salary</p>
           <p>• Directors: No EPF/ETF deductions</p>
-          <p>• <strong>Monthly</strong> = basic ÷ 26 × days present · <strong>Hourly</strong> = rate × hours (8h/day + OT from attendance)</p>
+          <p>• <strong>Hourly</strong> = rate × hours (8h for each paid day, 4h for a half day). OT is paid separately</p>
+          <p>• <strong>OT pay</strong> = OT hours × hourly rate. Monthly staff use basic ÷ 26 ÷ 8 per OT hour. The amount is shown on each row and in Total OT</p>
+          <p>• <strong>Late</strong> removes one hour of salary for each hour marked late on attendance. Monthly staff lose basic ÷ 26 ÷ 8 per late hour</p>
           <p>• EPF/ETF only if ticked on the employee profile</p>
-          <p>• Bike commission counts when present on sale date — save attendance, then <strong>Recalculate</strong></p>
+          <p>• Bike commission: each completed sale that month, if the worker was present or half-day that day. Open <strong>Worker Commissions</strong> or click Recalculate.</p>
           <p>• Generate slips per employee under <strong>Payslips</strong> after saving payroll</p>
         </div>
       </div>
