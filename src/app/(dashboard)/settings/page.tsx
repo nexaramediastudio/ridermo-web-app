@@ -64,7 +64,7 @@ function CompanySettings() {
   async function handleSave() {
     setSaving(true);
     const payload: Omit<CompanySettingsData, "id" | "updated_at"> = {
-      company_name: form.company_name.trim() || "RIDERMO",
+      company_name: form.company_name.trim() || "Ridermo PVT LTD",
       tagline: form.tagline.trim() || null,
       logo_url: logoUrl,
       phone: form.phone.trim() || null,
@@ -98,7 +98,7 @@ function CompanySettings() {
     }
     setLogoUrl(url);
     const payload: Omit<CompanySettingsData, "id" | "updated_at"> = {
-      company_name: form.company_name.trim() || "RIDERMO",
+      company_name: form.company_name.trim() || "Ridermo PVT LTD",
       tagline: form.tagline.trim() || null,
       logo_url: url,
       phone: form.phone.trim() || null,

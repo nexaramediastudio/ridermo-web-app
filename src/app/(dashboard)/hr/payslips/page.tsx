@@ -292,7 +292,7 @@ export default function PayslipsPage() {
     setPreviewId(null);
   }
 
-  const company = { name: settings.company_name || "RIDERMO", logoUrl: settings.logo_url };
+  const company = { name: settings.company_name || "Ridermo PVT LTD", logoUrl: settings.logo_url };
   const slipFor = (row: PayslipRow) => toPayslipData(
     row,
     attendanceMap[row.employee_id] || EMPTY_ATTENDANCE,

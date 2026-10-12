@@ -21,7 +21,7 @@ export interface CompanySettings {
 
 export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   id: COMPANY_SETTINGS_ID,
-  company_name: "RIDERMO",
+  company_name: "Ridermo PVT LTD",
   tagline: "Premium TVS Dealership",
   logo_url: null,
   phone: null,
@@ -42,7 +42,12 @@ export async function fetchCompanySettings(): Promise<CompanySettings> {
     .maybeSingle();
 
   if (error || !data) return DEFAULT_COMPANY_SETTINGS;
-  return data as CompanySettings;
+  const settings = data as CompanySettings;
+  const storedName = settings.company_name?.trim() || "";
+  if (!storedName || /^ridermo$/i.test(storedName)) {
+    settings.company_name = "Ridermo PVT LTD";
+  }
+  return settings;
 }
 
 export async function saveCompanySettings(

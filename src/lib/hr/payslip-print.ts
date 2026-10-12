@@ -197,7 +197,8 @@ function earningRow(component: string, basis: string, rate: string, amount: stri
 export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
   const emp = data.employee;
   const statement = data.statement;
-  const companyName = data.company?.name?.trim() || "RIDERMO";
+  const storedName = data.company?.name?.trim() || "";
+  const companyName = !storedName || /^ridermo$/i.test(storedName) ? "Ridermo PVT LTD" : storedName;
   const logoUrl = data.company?.logoUrl || "";
   const monthShort = MONTHS[data.month - 1].slice(0, 3).toUpperCase();
   const period = `${monthShort} ${data.year}`;
@@ -292,9 +293,9 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
     .body { flex: 1; }
     .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
     .logo { height: 72px; width: auto; max-width: 220px; object-fit: contain; object-position: left center; }
-    .logo-fallback { font-size: 28px; font-weight: 800; letter-spacing: -0.04em; color: #FF4C00; }
+    .logo-fallback { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; color: #FF4C00; }
     .brand { text-align: right; }
-    .brand h1 { font-size: 22px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+    .brand h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
     .brand p { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #444; margin-top: 3px; text-transform: uppercase; }
     .brand .doc-type { color: #FF4C00; font-weight: 800; margin-top: 6px; }
     .rule { height: 1px; background: #111; margin: 18px 0 16px; }
@@ -329,7 +330,7 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
     .sign-line { margin-top: 42px; border-top: 1px solid #CCC; padding-top: 6px; font-size: 11px; color: #666; }
     .footer {
       margin-top: auto; padding-top: 8mm; display: flex; justify-content: space-between;
-      font-size: 10px; letter-spacing: 0.06em; color: #666; text-transform: uppercase;
+      font-size: 10px; letter-spacing: 0.06em; color: #666;
     }
     @page { size: A4 portrait; margin: 0; }
     @media print {
@@ -424,7 +425,7 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
     </div>
 
     <div class="footer">
-      <span>${esc(companyName)} | Confidential Payroll Document</span>
+      <span>${esc(companyName)} | CONFIDENTIAL PAYROLL DOCUMENT</span>
       <span>${period}</span>
     </div>
   </div>
