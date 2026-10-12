@@ -3,6 +3,7 @@ export const HOURS_PER_DAY = 8;
 export const EPF_RATE = 0.08;
 export const ETF_RATE = 0.03;
 export const SUNDAY_HOLIDAY_DAY_PAY = 2144;
+export const OT_HOUR_PAY = 268;
 
 export type SalaryType = "monthly" | "hourly";
 
@@ -41,6 +42,7 @@ export interface PayrollCalcResult {
   otPay: number;
   lateHours: number;
   lateDeduction: number;
+  regularPay: number;
   earnedBasic: number;
   bikeCommission: number;
   gross: number;
@@ -92,7 +94,7 @@ export function calcHoursWorked(att: AttendanceSummary): number {
   return payableDays(att) * HOURS_PER_DAY + att.otHours;
 }
 
-export function otHourlyRate(input: { salaryType: SalaryType; basicSalary: number; hourlyRate: number }): number {
+export function salaryHourRate(input: { salaryType: SalaryType; basicSalary: number; hourlyRate: number }): number {
   if (input.salaryType === "hourly") return input.hourlyRate || 0;
   return (input.basicSalary || 0) / STANDARD_WORKING_DAYS / HOURS_PER_DAY;
 }
@@ -107,10 +109,9 @@ export function calculatePayroll(input: PayrollCalcInput): PayrollCalcResult {
   const absentDays = input.attendance.absent;
   const hoursWorked = calcHoursWorked(input.attendance);
   const regularHours = payableDays(input.attendance) * HOURS_PER_DAY;
-  const hourRate = otHourlyRate(input);
-  const otPay = Math.round((input.attendance.otHours || 0) * hourRate);
+  const otPay = Math.round((input.attendance.otHours || 0) * OT_HOUR_PAY);
   const lateHours = input.attendance.lateHours || 0;
-  const lateDeduction = Math.round(lateHours * hourRate);
+  const lateDeduction = Math.round(lateHours * salaryHourRate(input));
 
   const regularPay =
     input.salaryType === "hourly"
@@ -143,6 +144,7 @@ export function calculatePayroll(input: PayrollCalcInput): PayrollCalcResult {
     otPay,
     lateHours,
     lateDeduction,
+    regularPay,
     earnedBasic,
     bikeCommission,
     gross,

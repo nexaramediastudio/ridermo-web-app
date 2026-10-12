@@ -8,7 +8,7 @@ import {
   CheckCircle2, AlertCircle, RefreshCw, Clock,
 } from "lucide-react";
 import { syncWorkerCommissionsForMonth } from "@/lib/hr/worker-commissions";
-import { calculatePayroll, summarizeAttendance, SUNDAY_HOLIDAY_DAY_PAY } from "@/lib/hr/payroll-calc";
+import { calculatePayroll, summarizeAttendance, OT_HOUR_PAY, SUNDAY_HOLIDAY_DAY_PAY } from "@/lib/hr/payroll-calc";
 
 interface Employee {
   id: string;
@@ -347,8 +347,9 @@ export default function PayrollPage() {
                             </p>
                           )}
                           <p className="text-amber-700 font-semibold mt-0.5">
-                            {formatOt(entry.ot_hours || 0)} OT hrs
-                            {(entry.ot_pay || 0) > 0 ? ` · Rs. ${entry.ot_pay.toLocaleString("en", { maximumFractionDigits: 0 })}` : ""}
+                            {(entry.ot_hours || 0) > 0
+                              ? `${formatOt(entry.ot_hours || 0)} OT × Rs. ${OT_HOUR_PAY}`
+                              : `${formatOt(entry.ot_hours || 0)} OT hrs`}
                           </p>
                           {(entry.late_hours || 0) > 0 && (
                             <p className="text-red-600 font-semibold mt-0.5">
@@ -419,7 +420,7 @@ export default function PayrollPage() {
                               OT Rs. {(entry.ot_pay || 0).toLocaleString("en", { maximumFractionDigits: 0 })}
                             </p>
                             <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">
-                              {formatOt(entry.ot_hours || 0)} hrs
+                              {formatOt(entry.ot_hours || 0)} × Rs. {OT_HOUR_PAY}
                             </p>
                           </div>
                         ) : (
@@ -428,7 +429,7 @@ export default function PayrollPage() {
                               {(entry.ot_pay || 0) > 0 ? `Rs. ${entry.ot_pay.toLocaleString("en", { maximumFractionDigits: 0 })}` : "—"}
                             </span>
                             <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mt-0.5">
-                              {formatOt(entry.ot_hours || 0)} OT hrs
+                              {formatOt(entry.ot_hours || 0)} × Rs. {OT_HOUR_PAY}
                             </p>
                             {(entry.bonus || 0) > 0 && (
                               <p className="text-[10px] text-[#6B6B6B] mt-0.5">
@@ -504,7 +505,7 @@ export default function PayrollPage() {
           <p>• Workers: EPF 8% + ETF 3% deducted from gross salary</p>
           <p>• Directors: No EPF/ETF deductions</p>
           <p>• <strong>Hourly</strong> = rate × hours (8h for each paid day, 4h for a half day). OT is paid separately</p>
-          <p>• <strong>OT pay</strong> = OT hours × hourly rate. Monthly staff use basic ÷ 26 ÷ 8 per OT hour. The amount is shown on each row and in Total OT</p>
+          <p>• <strong>OT pay</strong> = OT hours × Rs. {OT_HOUR_PAY}. Shown on each row and in Total OT</p>
           <p>• <strong>Late</strong> removes one hour of salary for each hour marked late on attendance. Monthly staff lose basic ÷ 26 ÷ 8 per late hour</p>
           <p>• EPF/ETF only if ticked on the employee profile</p>
           <p>• Bike commission: each completed sale that month, if the worker was present or half-day that day. Open <strong>Worker Commissions</strong> or click Recalculate.</p>

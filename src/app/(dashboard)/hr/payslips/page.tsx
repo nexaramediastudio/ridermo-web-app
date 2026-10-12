@@ -8,10 +8,11 @@ import {
   FileText, ChevronLeft, ChevronRight, RefreshCw,
   Printer, Eye, AlertCircle,
 } from "lucide-react";
-import { printPayslip, type PayslipData } from "@/lib/hr/payslip-print";
+import { buildSalaryStatement, printPayslip, type PayslipData } from "@/lib/hr/payslip-print";
 import { PayslipDetail } from "@/components/hr/payslip-detail";
 import { syncWorkerCommissionsForMonth } from "@/lib/hr/worker-commissions";
-import { calculatePayroll, calcHoursWorked, summarizeAttendance } from "@/lib/hr/payroll-calc";
+import { calculatePayroll, summarizeAttendance, type AttendanceSummary } from "@/lib/hr/payroll-calc";
+import { useCompanySettings } from "@/components/providers/company-settings-provider";
 
 interface PayslipRow {
   id: string;
@@ -46,21 +47,57 @@ interface PayslipRow {
     join_date?: string;
     basic_salary?: number;
     hourly_rate?: number;
+    per_bike_commission?: number;
+    email?: string;
     salary_type: string;
     has_epf: boolean;
     has_etf: boolean;
   } | null;
 }
 
+interface BikeStat {
+  count: number;
+  amount: number;
+}
+
+const EMPTY_ATTENDANCE: AttendanceSummary = {
+  present: 0,
+  absent: 0,
+  paidLeave: 0,
+  sundayHolidayDays: 0,
+  otHours: 0,
+  lateHours: 0,
+};
+
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-function toPayslipData(row: PayslipRow, hoursWorked?: number): PayslipData {
+function toPayslipData(
+  row: PayslipRow,
+  attendance: AttendanceSummary,
+  bikes: BikeStat,
+  company: { name: string; logoUrl: string | null },
+): PayslipData {
   const emp = row.employees!;
+  const monthShort = MONTHS[row.month - 1].slice(0, 3).toUpperCase();
+  const salaryType = (emp.salary_type as "monthly" | "hourly") || "monthly";
+  const statement = buildSalaryStatement({
+    salaryType,
+    basicSalary: Number(emp.basic_salary || 0),
+    hourlyRate: Number(emp.hourly_rate || 0),
+    attendance,
+    bikeCount: emp.type === "worker" ? bikes.count : 0,
+    perBikeCommission: Number(emp.per_bike_commission || 0),
+    bikeAmount: emp.type === "worker" ? bikes.amount : 0,
+    attendanceBonus: Number(row.attendance_bonus || 0),
+    bonus: Number(row.bonus || 0),
+  });
+
   return {
     month: row.month,
     year: row.year,
-    slipRef: `${emp.employee_code || row.employee_id.slice(0, 8)}-${row.year}-${String(row.month).padStart(2, "0")}`,
+    slipRef: `PAY/${monthShort}/${row.year}`,
+    company,
     employee: {
       full_name: emp.full_name,
       employee_code: emp.employee_code,
@@ -68,21 +105,24 @@ function toPayslipData(row: PayslipRow, hoursWorked?: number): PayslipData {
       department: emp.department,
       nic: emp.nic,
       phone: emp.phone,
+      email: emp.email,
       join_date: emp.join_date,
       type: emp.type,
-      salary_type: emp.salary_type || "monthly",
+      salary_type: salaryType,
       basic_salary: emp.basic_salary,
       hourly_rate: emp.hourly_rate,
+      per_bike_commission: emp.per_bike_commission,
       has_epf: emp.has_epf ?? false,
       has_etf: emp.has_etf ?? false,
     },
+    statement,
     payroll: {
-      basic_salary: row.basic_salary,
+      basic_salary: statement.basicAmount,
       attendance_bonus: row.attendance_bonus,
-      ot_pay: row.ot_pay,
-      bike_commission: row.bike_commission,
+      ot_pay: statement.otAmount,
+      bike_commission: statement.bikeAmount,
       bonus: row.bonus,
-      gross_salary: row.gross_salary,
+      gross_salary: statement.gross,
       epf_employee: row.epf_employee,
       etf: row.etf,
       other_deductions: row.other_deductions,
@@ -91,7 +131,6 @@ function toPayslipData(row: PayslipRow, hoursWorked?: number): PayslipData {
       working_days: row.working_days,
       present_days: row.present_days,
       absent_days: row.absent_days,
-      hours_worked: hoursWorked,
       status: row.status,
       paid_date: row.paid_date,
       notes: row.notes,
@@ -100,11 +139,13 @@ function toPayslipData(row: PayslipRow, hoursWorked?: number): PayslipData {
 }
 
 export default function PayslipsPage() {
+  const { settings } = useCompanySettings();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [payslips, setPayslips] = useState<PayslipRow[]>([]);
-  const [hoursMap, setHoursMap] = useState<Record<string, number>>({});
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceSummary>>({});
+  const [bikeMap, setBikeMap] = useState<Record<string, BikeStat>>({});
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -121,7 +162,7 @@ export default function PayslipsPage() {
         id, employee_id, month, year, basic_salary, attendance_bonus, ot_pay, bike_commission, bonus,
         gross_salary, epf_employee, etf, other_deductions, total_deductions, net_salary,
         working_days, present_days, absent_days, status, paid_date, notes,
-        employees(full_name, employee_code, type, designation, department, nic, phone, join_date, basic_salary, hourly_rate, salary_type, has_epf, has_etf)
+        employees(full_name, employee_code, type, designation, department, nic, phone, email, join_date, basic_salary, hourly_rate, per_bike_commission, salary_type, has_epf, has_etf)
       `)
       .eq("month", month)
       .eq("year", year)
@@ -131,24 +172,38 @@ export default function PayslipsPage() {
     setPayslips(rows);
 
     if (rows.length) {
-      const { data: att } = await supabase
-        .from("attendance")
-        .select("employee_id, status, ot_hours, late_hours, date, is_holiday")
-        .gte("date", monthStart)
-        .lt("date", monthEnd);
-      const hMap: Record<string, number> = {};
+      const [{ data: att }, { data: comms }] = await Promise.all([
+        supabase
+          .from("attendance")
+          .select("employee_id, status, ot_hours, late_hours, date, is_holiday")
+          .gte("date", monthStart)
+          .lt("date", monthEnd),
+        supabase
+          .from("worker_commissions")
+          .select("employee_id, amount")
+          .gte("sale_date", monthStart)
+          .lt("sale_date", monthEnd),
+      ]);
       const byEmp: Record<string, { status: string; ot_hours?: number | null; late_hours?: number | null; date?: string | null; is_holiday?: boolean | null }[]> = {};
       (att || []).forEach((r) => {
         if (!byEmp[r.employee_id]) byEmp[r.employee_id] = [];
         byEmp[r.employee_id].push(r);
       });
+      const summaries: Record<string, AttendanceSummary> = {};
       rows.forEach((p) => {
-        const s = summarizeAttendance(byEmp[p.employee_id] || []);
-        hMap[p.employee_id] = calcHoursWorked(s);
+        summaries[p.employee_id] = summarizeAttendance(byEmp[p.employee_id] || []);
       });
-      setHoursMap(hMap);
+      const bikes: Record<string, BikeStat> = {};
+      (comms || []).forEach((c) => {
+        if (!bikes[c.employee_id]) bikes[c.employee_id] = { count: 0, amount: 0 };
+        bikes[c.employee_id].count += 1;
+        bikes[c.employee_id].amount += Number(c.amount || 0);
+      });
+      setAttendanceMap(summaries);
+      setBikeMap(bikes);
     } else {
-      setHoursMap({});
+      setAttendanceMap({});
+      setBikeMap({});
     }
 
     setLoading(false);
@@ -237,6 +292,13 @@ export default function PayslipsPage() {
     setPreviewId(null);
   }
 
+  const company = { name: settings.company_name || "RIDERMO", logoUrl: settings.logo_url };
+  const slipFor = (row: PayslipRow) => toPayslipData(
+    row,
+    attendanceMap[row.employee_id] || EMPTY_ATTENDANCE,
+    bikeMap[row.employee_id] || { count: 0, amount: 0 },
+    company,
+  );
   const preview = payslips.find((p) => p.id === previewId);
 
   return (
@@ -244,7 +306,7 @@ export default function PayslipsPage() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="r-page-title">Payslips</h1>
-          <p className="r-page-sub">Generate and print salary slips one by one</p>
+          <p className="r-page-sub">Generate a salary statement for each employee</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Link href="/hr/payroll" className="r-btn-secondary text-sm">Open Payroll</Link>
@@ -275,8 +337,7 @@ export default function PayslipsPage() {
         </button>
       </div>
 
-      <div className="flex gap-6 items-start">
-        <div className="flex-1 min-w-0 r-card overflow-hidden">
+      <div className="r-card overflow-hidden">
           <table className="r-table">
             <thead>
               <tr className="r-thead-row">
@@ -331,7 +392,7 @@ export default function PayslipsPage() {
                           <Eye className="h-3 w-3" /> Preview
                         </button>
                         <button
-                          onClick={() => printPayslip(toPayslipData(p, hoursMap[p.employee_id]))}
+                          onClick={() => printPayslip(slipFor(p))}
                           className="flex items-center gap-1 h-7 px-2 rounded-lg bg-[#FF4C00] text-white text-[11px] font-semibold hover:bg-[#E04400]"
                         >
                           <Printer className="h-3 w-3" /> Print
@@ -343,24 +404,19 @@ export default function PayslipsPage() {
               )}
             </tbody>
           </table>
-        </div>
-
-        {preview && preview.employees ? (
-          <div className="w-[400px] flex-shrink-0">
-            <div className="r-card p-5 sticky top-4">
-              <PayslipDetail
-                data={toPayslipData(preview, hoursMap[preview.employee_id])}
-                onPrint={() => printPayslip(toPayslipData(preview, hoursMap[preview.employee_id]))}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="w-[400px] flex-shrink-0 r-card p-12 text-center border-dashed">
-            <Eye className="h-8 w-8 mx-auto mb-2 text-[#D0D0D0]" />
-            <p className="text-sm text-[#9A9A9A]">Select an employee to see full payslip details</p>
-          </div>
-        )}
       </div>
+
+      {preview && preview.employees ? (
+        <PayslipDetail
+          data={slipFor(preview)}
+          onPrint={() => printPayslip(slipFor(preview))}
+        />
+      ) : (
+        <div className="r-card p-12 text-center border-dashed">
+          <Eye className="h-8 w-8 mx-auto mb-2 text-[#D0D0D0]" />
+          <p className="text-sm text-[#9A9A9A]">Select an employee to see the salary statement</p>
+        </div>
+      )}
     </div>
   );
 }
