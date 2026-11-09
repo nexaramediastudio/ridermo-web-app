@@ -526,7 +526,7 @@ export default function PayrollPage() {
           <p>• <strong>OT pay</strong> = OT hours × Rs. {OT_HOUR_PAY}. Shown on each row and in Total OT</p>
           <p>• <strong>Late</strong> removes one hour of salary for each hour marked late on attendance. Monthly staff lose basic ÷ 26 ÷ 8 per late hour</p>
           <p>• EPF/ETF only if ticked on the employee profile</p>
-          <p>• Bike commission: each completed sale that month, if the worker was present or half-day that day. Open <strong>Worker Commissions</strong> or click Recalculate.</p>
+          <p>• Bike commission: the person selected as <strong>Sold by</strong> on each sale that month. Open <strong>Worker Commissions</strong> or click Recalculate.</p>
           <p>• <strong>Advance</strong> money from HR → Advances is deducted from net salary for this month</p>
           <p>• Generate slips per employee under <strong>Payslips</strong> after saving payroll</p>
         </div>

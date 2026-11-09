@@ -17,6 +17,7 @@ interface SaleRow {
   id: string;
   invoice_number: string;
   sale_date: string;
+  sold_by: string | null;
   inventory_bikes: { round_number: string; bike_models: { name: string } | null } | null;
   customers: { full_name: string } | null;
 }
@@ -35,12 +36,6 @@ interface CommissionRow {
   employee_id: string;
   amount: number;
   sale_date: string;
-}
-
-interface AttendanceRow {
-  employee_id: string;
-  date: string;
-  status: string;
 }
 
 const MONTHS = [
@@ -65,7 +60,6 @@ export default function WorkerCommissionsAdminPage() {
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [workers, setWorkers] = useState<WorkerRow[]>([]);
   const [commissions, setCommissions] = useState<CommissionRow[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -78,10 +72,10 @@ export default function WorkerCommissionsAdminPage() {
       toast.error((err as Error).message || "Failed to sync worker commissions");
     }
 
-    const [salesRes, empRes, commRes, attRes] = await Promise.all([
+    const [salesRes, empRes, commRes] = await Promise.all([
       supabase
         .from("sales")
-        .select("id, invoice_number, sale_date, inventory_bikes(round_number, bike_models(name)), customers(full_name)")
+        .select("id, invoice_number, sale_date, sold_by, inventory_bikes(round_number, bike_models(name)), customers(full_name)")
         .eq("status", "completed")
         .gte("sale_date", start)
         .lt("sale_date", end)
@@ -89,7 +83,6 @@ export default function WorkerCommissionsAdminPage() {
       supabase
         .from("employees")
         .select("id, full_name, per_bike_commission, type, is_active")
-        .eq("type", "worker")
         .eq("is_active", true)
         .order("full_name"),
       supabase
@@ -97,19 +90,12 @@ export default function WorkerCommissionsAdminPage() {
         .select("id, sale_id, employee_id, amount, sale_date")
         .gte("sale_date", start)
         .lt("sale_date", end),
-      supabase
-        .from("attendance")
-        .select("employee_id, date, status")
-        .gte("date", start)
-        .lt("date", end)
-        .in("status", ["present", "half_day"]),
     ]);
 
     if (salesRes.error) toast.error(salesRes.error.message);
     setSales((salesRes.data as unknown as SaleRow[]) || []);
     setWorkers((empRes.data as WorkerRow[]) || []);
     setCommissions((commRes.data as CommissionRow[]) || []);
-    setAttendance((attRes.data as AttendanceRow[]) || []);
     setLoading(false);
   }, [month, year]);
 
@@ -144,9 +130,6 @@ export default function WorkerCommissionsAdminPage() {
     setYear(y);
   }
 
-  const presentOn = (employeeId: string, date: string) =>
-    attendance.some((a) => a.employee_id === employeeId && toDateOnly(a.date) === toDateOnly(date));
-
   const commissionsForSale = (saleId: string) =>
     commissions.filter((c) => c.sale_id === saleId);
 
@@ -154,16 +137,13 @@ export default function WorkerCommissionsAdminPage() {
     const rows = commissions.filter((c) => c.employee_id === w.id);
     const bikes = rows.length;
     const total = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
-    const saleDaysPresent = new Set(
-      sales.filter((s) => presentOn(w.id, s.sale_date)).map((s) => toDateOnly(s.sale_date)),
-    ).size;
-    return { ...w, bikes, total, saleDaysPresent };
-  });
+    return { ...w, bikes, total };
+  }).filter((w) => w.type === "worker" || w.bikes > 0);
 
   const totalBikes = sales.length;
   const totalPayout = commissions.reduce((s, c) => s + Number(c.amount || 0), 0);
   const earningWorkers = workerTotals.filter((w) => w.bikes > 0).length;
-  const missingRate = workers.filter((w) => !(Number(w.per_bike_commission) > 0));
+  const missingRate = workers.filter((w) => w.type === "worker" && !(Number(w.per_bike_commission) > 0));
 
   return (
     <div className="space-y-5">
@@ -175,7 +155,7 @@ export default function WorkerCommissionsAdminPage() {
           <div>
             <h1 className="r-page-title">Worker Commissions</h1>
             <p className="r-page-sub">
-              Present or half-day on a sale date = one commission per bike sold that day
+              Commission for each sale goes only to the person selected as Sold by
             </p>
           </div>
         </div>
@@ -224,7 +204,7 @@ export default function WorkerCommissionsAdminPage() {
           <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700">
             <strong>{missingRate.map((w) => w.full_name).join(", ")}</strong>
-            {missingRate.length === 1 ? " has" : " have"} no per-bike commission set on Employees, so they earn Rs. 0 even if present on a sale day.
+            {missingRate.length === 1 ? " has" : " have"} no per-bike commission set on Employees, so they earn Rs. 0 even if they are selected as Sold by.
           </p>
         </div>
       )}
@@ -232,15 +212,14 @@ export default function WorkerCommissionsAdminPage() {
       <div className="r-card overflow-hidden">
         <div className="px-5 py-4 border-b border-[#F0F0F0]">
           <h2 className="text-[13px] font-bold text-[#0A0A0A]">By worker</h2>
-          <p className="text-[11px] text-[#9A9A9A] mt-0.5">Bikes this month × their per-bike rate</p>
+          <p className="text-[11px] text-[#9A9A9A] mt-0.5">Bikes they sold this month × their per-bike rate</p>
         </div>
         <table className="r-table">
           <thead>
             <tr className="r-thead-row">
               <th className="r-th">Worker</th>
               <th className="r-th">Rate / bike</th>
-              <th className="r-th">Sale days present</th>
-              <th className="r-th">Bikes</th>
+              <th className="r-th">Bikes sold</th>
               <th className="r-th text-right">Commission</th>
             </tr>
           </thead>
@@ -248,14 +227,14 @@ export default function WorkerCommissionsAdminPage() {
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i} className="border-b border-[#F5F5F5]">
-                  {Array.from({ length: 5 }).map((_, j) => (
+                  {Array.from({ length: 4 }).map((_, j) => (
                     <td key={j} className="r-td"><div className="h-4 bg-[#F0F0F0] rounded animate-pulse" /></td>
                   ))}
                 </tr>
               ))
             ) : workers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-[13px] text-[#9A9A9A]">
+                <td colSpan={4} className="px-5 py-12 text-center text-[13px] text-[#9A9A9A]">
                   No active workers
                 </td>
               </tr>
@@ -270,7 +249,6 @@ export default function WorkerCommissionsAdminPage() {
                       ? `Rs. ${Number(w.per_bike_commission).toLocaleString()}`
                       : "—"}
                   </td>
-                  <td className="r-td text-[12px] text-[#6B6B6B]">{w.saleDaysPresent}</td>
                   <td className="r-td text-[12px] font-semibold text-[#0A0A0A]">{w.bikes}</td>
                   <td className="r-td text-right text-[13px] font-bold text-[#FF4C00]">
                     {w.total > 0 ? `Rs. ${w.total.toLocaleString()}` : "—"}
@@ -285,7 +263,7 @@ export default function WorkerCommissionsAdminPage() {
       <div className="r-card overflow-hidden">
         <div className="px-5 py-4 border-b border-[#F0F0F0]">
           <h2 className="text-[13px] font-bold text-[#0A0A0A]">Sales this month</h2>
-          <p className="text-[11px] text-[#9A9A9A] mt-0.5">Workers marked present or half-day on that day get commission</p>
+          <p className="text-[11px] text-[#9A9A9A] mt-0.5">Only the person selected on the sale earns commission</p>
         </div>
         <table className="r-table">
           <thead>
@@ -293,7 +271,7 @@ export default function WorkerCommissionsAdminPage() {
               <th className="r-th">Date</th>
               <th className="r-th">Invoice</th>
               <th className="r-th">Bike</th>
-              <th className="r-th">Workers who earned</th>
+              <th className="r-th">Sold by</th>
             </tr>
           </thead>
           <tbody>
@@ -314,14 +292,11 @@ export default function WorkerCommissionsAdminPage() {
             ) : (
               sales.map((sale) => {
                 const earned = commissionsForSale(sale.id);
-                const earnedWorkers = earned
-                  .map((c) => workers.find((w) => w.id === c.employee_id))
-                  .filter(Boolean) as WorkerRow[];
-                const presentNoPay = workers.filter(
-                  (w) =>
-                    presentOn(w.id, sale.sale_date) &&
-                    !earned.some((c) => c.employee_id === w.id),
-                );
+                const seller =
+                  workers.find((w) => w.id === sale.sold_by) ||
+                  workers.find((w) => earned.some((c) => c.employee_id === w.id));
+                const sellerRate = Number(seller?.per_bike_commission) || 0;
+                const payout = earned.reduce((s, c) => s + Number(c.amount || 0), 0);
                 return (
                   <tr key={sale.id} className="r-tr">
                     <td className="r-td text-[12px] text-[#6B6B6B] whitespace-nowrap">
@@ -343,25 +318,22 @@ export default function WorkerCommissionsAdminPage() {
                       )}
                     </td>
                     <td className="r-td">
-                      {earnedWorkers.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {earnedWorkers.map((w) => (
-                            <span
-                              key={w.id}
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full"
-                            >
-                              <UserCheck className="h-3 w-3" />
-                              {w.full_name}
+                      {seller ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full">
+                            <UserCheck className="h-3 w-3" />
+                            {seller.full_name}
+                          </span>
+                          {payout > 0 ? (
+                            <span className="text-[11px] font-semibold text-[#FF4C00]">
+                              Rs. {payout.toLocaleString()}
                             </span>
-                          ))}
+                          ) : sellerRate <= 0 ? (
+                            <span className="text-[10px] text-amber-600">No rate set</span>
+                          ) : null}
                         </div>
                       ) : (
-                        <span className="text-[12px] text-[#ABABAB]">No one present</span>
-                      )}
-                      {presentNoPay.length > 0 && (
-                        <p className="text-[10px] text-amber-600 mt-1">
-                          Present, no rate: {presentNoPay.map((w) => w.full_name).join(", ")}
-                        </p>
+                        <span className="text-[12px] text-[#ABABAB]">Not selected</span>
                       )}
                     </td>
                   </tr>

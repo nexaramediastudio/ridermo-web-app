@@ -19,25 +19,23 @@ export function monthBounds(year: number, month: number): { start: string; end: 
   return { start, end };
 }
 
-interface CommissionWorker {
+interface CommissionEmployee {
   id: string;
   per_bike_commission: number;
 }
 
-async function loadCommissionWorkers(supabase: SupabaseClient): Promise<CommissionWorker[]> {
+async function loadCommissionEmployees(supabase: SupabaseClient): Promise<CommissionEmployee[]> {
   const { data, error } = await supabase
     .from("employees")
-    .select("id, per_bike_commission")
-    .eq("type", "worker")
-    .eq("is_active", true)
-    .gt("per_bike_commission", 0);
+    .select("id, per_bike_commission");
   if (error) throw error;
-  return (data || []) as CommissionWorker[];
+  return (data || []) as CommissionEmployee[];
 }
 
 /**
- * Align worker_commissions with attendance for given dates and all sales on those dates.
- * A worker earns their per-bike rate for every completed sale on a day they were present or half-day.
+ * Align worker_commissions with completed sales on the given dates.
+ * Commission for a sale goes only to the employee selected as sold_by.
+ * Older sales with no sold_by still use present/half-day attendance as a fallback.
  */
 export async function syncWorkerCommissionsForDates(
   supabase: SupabaseClient,
@@ -46,13 +44,15 @@ export async function syncWorkerCommissionsForDates(
   const uniqueDates = [...new Set(dates.map(toDateOnly).filter(Boolean))];
   if (!uniqueDates.length) return { added: 0, removed: 0 };
 
-  const workers = await loadCommissionWorkers(supabase);
-  const workerById = new Map(workers.map((w) => [w.id, w]));
-  const workerIds = workers.map((w) => w.id);
+  const employees = await loadCommissionEmployees(supabase);
+  const employeeById = new Map(employees.map((e) => [e.id, e]));
+  const workerIds = employees
+    .filter((e) => Number(e.per_bike_commission) > 0)
+    .map((e) => e.id);
 
   const { data: sales, error: salesErr } = await supabase
     .from("sales")
-    .select("id, sale_date")
+    .select("id, sale_date, sold_by")
     .eq("status", "completed")
     .in("sale_date", uniqueDates);
   if (salesErr) throw salesErr;
@@ -60,6 +60,7 @@ export async function syncWorkerCommissionsForDates(
   const saleList = (sales || []).map((s) => ({
     id: s.id as string,
     sale_date: toDateOnly(s.sale_date as string),
+    sold_by: (s.sold_by as string | null) || null,
   }));
 
   if (!saleList.length) {
@@ -78,30 +79,18 @@ export async function syncWorkerCommissionsForDates(
   }
 
   const saleIds = saleList.map((s) => s.id);
-
-  if (!workers.length) {
-    const { data: stale, error: staleErr } = await supabase
-      .from("worker_commissions")
-      .select("id")
-      .in("sale_id", saleIds);
-    if (staleErr) throw staleErr;
-    if (!stale?.length) return { added: 0, removed: 0 };
-    const { error: delErr } = await supabase
-      .from("worker_commissions")
-      .delete()
-      .in("id", stale.map((r) => r.id));
-    if (delErr) throw delErr;
-    return { added: 0, removed: stale.length };
-  }
+  const needsAttendanceFallback = saleList.some((s) => !s.sold_by);
 
   const [{ data: existing, error: existingErr }, { data: attendance, error: attErr }, { data: pendingComm, error: pendingErr }] =
     await Promise.all([
       supabase.from("worker_commissions").select("id, sale_id, employee_id").in("sale_id", saleIds),
-      supabase
-        .from("attendance")
-        .select("employee_id, status, date")
-        .in("date", uniqueDates)
-        .in("employee_id", workerIds),
+      needsAttendanceFallback && workerIds.length
+        ? supabase
+            .from("attendance")
+            .select("employee_id, status, date")
+            .in("date", uniqueDates)
+            .in("employee_id", workerIds)
+        : Promise.resolve({ data: [] as { employee_id: string; status: string; date: string }[], error: null }),
       supabase.from("commission_records").select("sale_id").in("sale_id", saleIds).eq("status", "pending"),
     ]);
 
@@ -130,23 +119,33 @@ export async function syncWorkerCommissionsForDates(
     received_at: string | null;
   }[] = [];
 
+  function addRow(saleId: string, employeeId: string, saleDate: string, received: boolean) {
+    const emp = employeeById.get(employeeId);
+    const amount = Number(emp?.per_bike_commission) || 0;
+    if (!(amount > 0)) return;
+    const key = `${saleId}:${employeeId}`;
+    if (desired.has(key)) return;
+    desired.add(key);
+    desiredRows.push({
+      sale_id: saleId,
+      employee_id: employeeId,
+      sale_date: saleDate,
+      amount,
+      status: received ? "received" : "pending",
+      received_at: received ? now : null,
+    });
+  }
+
   for (const sale of saleList) {
+    const received = !pendingSaleIds.has(sale.id);
+    if (sale.sold_by) {
+      addRow(sale.id, sale.sold_by, sale.sale_date, received);
+      continue;
+    }
     const present = presentByDate.get(sale.sale_date);
     if (!present?.size) continue;
-    const received = !pendingSaleIds.has(sale.id);
     for (const empId of present) {
-      const worker = workerById.get(empId);
-      if (!worker) continue;
-      const key = `${sale.id}:${empId}`;
-      desired.add(key);
-      desiredRows.push({
-        sale_id: sale.id,
-        employee_id: empId,
-        sale_date: sale.sale_date,
-        amount: Number(worker.per_bike_commission) || 0,
-        status: received ? "received" : "pending",
-        received_at: received ? now : null,
-      });
+      addRow(sale.id, empId, sale.sale_date, received);
     }
   }
 
@@ -179,9 +178,7 @@ export async function syncWorkerCommissionsForDates(
 }
 
 /**
- * Align worker_commissions with attendance for a date and all sales on that date.
- * Call after saving attendance (including backdated days) so workers get bike
- * commissions even when attendance was marked after the sale.
+ * Align worker_commissions for a date and all sales on that date.
  */
 export async function syncWorkerCommissionsForDate(
   supabase: SupabaseClient,

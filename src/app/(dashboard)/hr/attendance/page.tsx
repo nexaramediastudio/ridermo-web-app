@@ -188,10 +188,8 @@ export default function AttendancePage() {
         if (leaveSynced > 0) {
           parts.push(`${leaveSynced} leave record${leaveSynced !== 1 ? "s" : ""} added to Leave Management`);
         }
-        if (added > 0) {
-          parts.push(`${added} bike commission${added !== 1 ? "s" : ""} added`);
-        } else if (removed > 0) {
-          parts.push(`${removed} bike commission${removed !== 1 ? "s" : ""} removed`);
+        if (added > 0 || removed > 0) {
+          parts.push("worker commissions updated");
         }
         toast.success(parts.join(" · "));
       } catch (syncErr) {

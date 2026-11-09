@@ -42,6 +42,13 @@ interface CustomerOption {
   nic?: string;
 }
 
+interface EmployeeOption {
+  id: string;
+  full_name: string;
+  type: string;
+  per_bike_commission?: number;
+}
+
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -108,6 +115,8 @@ export default function NewSalePage() {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [saleDate, setSaleDate] = useState(localISODate);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [soldBy, setSoldBy] = useState("");
 
   const [bikeSearch, setBikeSearch]     = useState("");
   const [bikes, setBikes]               = useState<StockBike[]>([]);
@@ -165,8 +174,19 @@ export default function NewSalePage() {
       .then(({ data }) => setFinanceCompanies(data || []));
     supabase.from("insurance_companies").select("id, name, commission_rate").eq("is_active", true).order("name")
       .then(({ data }) => setInsuranceCompanies(data || []));
+    supabase.from("employees").select("id, full_name, type, per_bike_commission").eq("is_active", true).order("full_name")
+      .then(({ data }) => {
+        const list = (data || []) as EmployeeOption[];
+        list.sort((a, b) => {
+          if (a.type === "worker" && b.type !== "worker") return -1;
+          if (a.type !== "worker" && b.type === "worker") return 1;
+          return a.full_name.localeCompare(b.full_name);
+        });
+        setEmployees(list);
+      });
   }, []);
 
+  const soldByEmployee = employees.find((e) => e.id === soldBy) || null;
   const finalPrice  = parseFloat(salePrice) || selectedBike?.selling_price || 0;
   const discountAmt = parseFloat(discount) || 0;
   const totalAmount = finalPrice - discountAmt;
@@ -185,6 +205,10 @@ export default function NewSalePage() {
   }
 
   async function handleSubmit() {
+    if (!soldBy) {
+      toast.error("Select who made this sale");
+      return;
+    }
     setSaving(true);
     const supabase = createClient();
     try {
@@ -206,6 +230,7 @@ export default function NewSalePage() {
           sale_date: saleDate,
           bike_id: selectedBike!.id,
           customer_id: customerId,
+          sold_by: soldBy,
           selling_price: finalPrice,
           discount: discountAmt,
           total_amount: totalAmount,
@@ -240,7 +265,7 @@ export default function NewSalePage() {
         other_earnings: parseFloat(otherEarnings) || 0,
       }, saleDate);
 
-      // ── Worker commissions (synced from attendance for sale date) ──
+      // ── Worker commission: only the employee selected as sold_by ──
       await syncWorkerCommissionsForDate(supabase, saleDate);
 
       toast.success(`Sale completed! Invoice: ${invoiceNumber}. Dealership earnings added to revenue.`);
@@ -264,6 +289,26 @@ export default function NewSalePage() {
             <p className="text-[12px] font-bold text-[#0A0A0A]">{formatSaleDate(saleDate)}</p>
             {saleDate !== localISODate() && (
               <p className="text-[10px] text-[#FF4C00] mt-0.5">Backdated sale</p>
+            )}
+          </div>
+        </div>
+
+        {/* Sold by */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-bold text-[#ABABAB] uppercase tracking-wider">Sold by</p>
+          <div className="p-3 bg-[#F5F5F5] rounded-xl">
+            {soldByEmployee ? (
+              <>
+                <p className="text-[12px] font-bold text-[#0A0A0A]">{soldByEmployee.full_name}</p>
+                <p className="text-[10px] text-[#9A9A9A] mt-0.5">
+                  Commission goes only to this person
+                  {Number(soldByEmployee.per_bike_commission) > 0
+                    ? ` · Rs. ${Number(soldByEmployee.per_bike_commission).toLocaleString()} / bike`
+                    : ""}
+                </p>
+              </>
+            ) : (
+              <p className="text-[11px] text-[#ABABAB]">Not selected</p>
             )}
           </div>
         </div>
@@ -567,12 +612,35 @@ export default function NewSalePage() {
                 </div>
               )}
 
+              <div className="pt-1 border-t border-[#F0F0F0] space-y-2">
+                <Field label="Sold by" required>
+                  <select
+                    value={soldBy}
+                    onChange={(e) => setSoldBy(e.target.value)}
+                    className="r-select"
+                  >
+                    <option value="">Select who made this sale...</option>
+                    {employees.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.full_name}{e.type === "worker" ? "" : ` (${e.type})`}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <p className="text-[11px] text-[#9A9A9A]">
+                  Commission for this sale goes only to this person
+                </p>
+              </div>
+
               <div className="flex justify-between pt-2">
                 <button onClick={() => setStep(1)} className="r-btn-secondary">
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
                 <button
-                  disabled={customerMode === "new" ? !newCustomer.full_name || !newCustomer.phone : !selectedCustomer}
+                  disabled={
+                    !soldBy ||
+                    (customerMode === "new" ? !newCustomer.full_name || !newCustomer.phone : !selectedCustomer)
+                  }
                   onClick={() => setStep(3)}
                   className="r-btn-primary disabled:opacity-40"
                 >
@@ -737,17 +805,37 @@ export default function NewSalePage() {
               </div>
 
               {/* Detail rows */}
-              <div className="p-4 bg-[#FAFAFA] rounded-xl">
-                <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider mb-2">Sale Date</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-[#FF4C00]/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Calendar className="h-4 w-4 text-[#FF4C00]" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-[#FAFAFA] rounded-xl">
+                  <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider mb-2">Sale Date</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-[#FF4C00]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Calendar className="h-4 w-4 text-[#FF4C00]" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold text-[#0A0A0A]">{formatSaleDate(saleDate)}</p>
+                      <p className="text-[11px] text-[#9A9A9A]">
+                        {saleDate === localISODate() ? "Today" : "Previous sale — recorded on this date"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[13px] font-bold text-[#0A0A0A]">{formatSaleDate(saleDate)}</p>
-                    <p className="text-[11px] text-[#9A9A9A]">
-                      {saleDate === localISODate() ? "Today" : "Previous sale — recorded on this date"}
-                    </p>
+                </div>
+                <div className="p-4 bg-[#FAFAFA] rounded-xl">
+                  <p className="text-[10px] font-bold text-[#9A9A9A] uppercase tracking-wider mb-2">Sold by</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-[#FF4C00]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <User className="h-4 w-4 text-[#FF4C00]" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold text-[#0A0A0A]">{soldByEmployee?.full_name || "Not selected"}</p>
+                      <p className="text-[11px] text-[#9A9A9A]">
+                        {soldByEmployee
+                          ? Number(soldByEmployee.per_bike_commission) > 0
+                            ? `Commission Rs. ${Number(soldByEmployee.per_bike_commission).toLocaleString()} to this person only`
+                            : "Commission goes only to this person"
+                          : "Select who made this sale"}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -838,7 +926,7 @@ export default function NewSalePage() {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={saving}
+                  disabled={saving || !soldBy}
                   className="r-btn-primary disabled:opacity-60 h-10 px-8"
                 >
                   {saving ? (

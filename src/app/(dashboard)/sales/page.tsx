@@ -31,6 +31,8 @@ interface SaleRow {
   other_earnings: number;
   inventory_bikes: { round_number: string; bike_models: { name: string } | null } | null;
   customers: { full_name: string; phone?: string } | null;
+  sold_by?: string | null;
+  sold_by_name?: string | null;
 }
 
 const PAY: Record<string, { label: string; cls: string }> = {
@@ -77,7 +79,7 @@ export default function SalesHistoryPage() {
     const supabase = createClient();
     let query = supabase
       .from("sales")
-      .select(`id, invoice_number, sale_date, total_amount, payment_type, status,
+      .select(`id, invoice_number, sale_date, sold_by, total_amount, payment_type, status,
         tvs_commission, finance_commission, insurance_commission,
         transport_charges, documentation_charges, other_earnings,
         inventory_bikes(round_number, bike_models(name)),
@@ -95,8 +97,14 @@ export default function SalesHistoryPage() {
 
     const { data, error } = await query.limit(500);
     if (error) { toast.error("Failed to load sales"); setLoading(false); return; }
-    const rawRows = (data as unknown as Omit<SaleRow, "received_income" | "pending_income">[]) || [];
+    const rawRows = (data as unknown as Omit<SaleRow, "received_income" | "pending_income" | "sold_by_name">[]) || [];
     const saleIds = rawRows.map((s) => s.id);
+    const sellerIds = [...new Set(rawRows.map((s) => s.sold_by).filter(Boolean))] as string[];
+    let sellerNames: Record<string, string> = {};
+    if (sellerIds.length) {
+      const { data: emps } = await supabase.from("employees").select("id, full_name").in("id", sellerIds);
+      for (const e of emps || []) sellerNames[e.id] = e.full_name;
+    }
     let commMap: Record<string, { received: number; pending: number }> = {};
     if (saleIds.length) {
       const { data: comms } = await supabase
@@ -111,6 +119,7 @@ export default function SalesHistoryPage() {
     }
     const rows: SaleRow[] = rawRows.map((s) => ({
       ...s,
+      sold_by_name: s.sold_by ? sellerNames[s.sold_by] || null : null,
       transport_charges: s.transport_charges || 0,
       documentation_charges: s.documentation_charges || 0,
       other_earnings: s.other_earnings || 0,
@@ -176,7 +185,8 @@ export default function SalesHistoryPage() {
     const q = search.toLowerCase();
     return s.invoice_number.toLowerCase().includes(q) ||
       s.customers?.full_name?.toLowerCase().includes(q) ||
-      s.inventory_bikes?.bike_models?.name?.toLowerCase().includes(q);
+      s.inventory_bikes?.bike_models?.name?.toLowerCase().includes(q) ||
+      s.sold_by_name?.toLowerCase().includes(q);
   });
 
   const totalReceived = filtered.reduce((s, r) => s + r.received_income, 0);
@@ -328,7 +338,7 @@ export default function SalesHistoryPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#F0F0F0]">
-                {["Invoice", "Date", "Customer", "Bike", "Payment", "Vehicle Value", "Received", "Pending", "Actions"].map(h => (
+                {["Invoice", "Date", "Customer", "Bike", "Sold by", "Payment", "Vehicle Value", "Received", "Pending", "Actions"].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[10px] font-bold text-[#ABABAB] uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -337,14 +347,14 @@ export default function SalesHistoryPage() {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#F8F8F8]">
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <td key={j} className="px-5 py-3.5"><div className="h-3.5 bg-[#F0F0F0] rounded animate-pulse" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-16 text-center">
+                  <td colSpan={10} className="px-5 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-12 h-12 rounded-2xl bg-[#F5F5F5] flex items-center justify-center">
                         <FileText className="h-6 w-6 text-[#D0D0D0]" />
@@ -390,6 +400,9 @@ export default function SalesHistoryPage() {
                         )}
                       </td>
                       <td className="px-5 py-3.5">
+                        <span className="text-[12px] text-[#6B6B6B] whitespace-nowrap">{sale.sold_by_name || "—"}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${payStyle.cls}`}>{payStyle.label}</span>
                       </td>
                       <td className="px-5 py-3.5">
@@ -430,7 +443,7 @@ export default function SalesHistoryPage() {
             {filtered.length > 0 && !loading && (
               <tfoot>
                 <tr className="border-t-2 border-[#EBEBEB] bg-[#FAFAFA]">
-                  <td colSpan={5} className="px-5 py-3.5">
+                  <td colSpan={6} className="px-5 py-3.5">
                     <span className="text-[12px] font-bold text-[#0A0A0A]">Total ({filtered.length} sales)</span>
                   </td>
                   <td className="px-5 py-3.5">

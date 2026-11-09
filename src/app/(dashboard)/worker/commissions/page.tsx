@@ -113,7 +113,7 @@ export default function WorkerCommissionsPage() {
                 ) : rows.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-5 py-16 text-center text-[13px] text-[#9A9A9A]">
-                      No commissions yet — sell a bike on a day you are marked Present
+                      No commissions yet — you earn commission only on sales marked Sold by you
                     </td>
                   </tr>
                 ) : (

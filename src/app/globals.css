@@ -143,7 +143,12 @@
   /* ── Inputs ──────────────────── */
   .r-input    { @apply h-9 px-3 text-[13px] border border-[#E8E8E8] rounded-xl bg-white focus:outline-none focus:border-[#FF4C00] transition-colors w-full; }
   .r-textarea { @apply px-3 py-2.5 text-[13px] border border-[#E8E8E8] rounded-xl bg-white focus:outline-none focus:border-[#FF4C00] transition-colors w-full resize-none; }
-  .r-select   { @apply h-9 px-3 text-[13px] border border-[#E8E8E8] rounded-xl bg-white focus:outline-none focus:border-[#FF4C00] transition-colors w-full; }
+  .r-select   {
+    @apply h-9 pl-3 pr-9 text-[13px] leading-9 border border-[#E8E8E8] rounded-xl bg-white focus:outline-none focus:border-[#FF4C00] transition-colors w-full appearance-none bg-no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239A9A9A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-size: 12px 12px;
+  }
   .r-label    { @apply block text-[11px] font-semibold text-[#5A5A5A] mb-1.5; }
   .r-search   { @apply h-9 pl-9 pr-3 text-[13px] border border-[#E8E8E8] rounded-xl bg-white focus:outline-none focus:border-[#FF4C00] transition-colors w-full; }
 

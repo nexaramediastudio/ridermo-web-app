@@ -531,6 +531,7 @@ $$ LANGUAGE plpgsql;
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_sales_date ON public.sales(sale_date);
 CREATE INDEX IF NOT EXISTS idx_sales_customer ON public.sales(customer_id);
+CREATE INDEX IF NOT EXISTS idx_sales_sold_by ON public.sales(sold_by);
 CREATE INDEX IF NOT EXISTS idx_inventory_status ON public.inventory_bikes(status);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON public.attendance(date);
 CREATE INDEX IF NOT EXISTS idx_cheques_payment_date ON public.cheques(payment_date);
