@@ -152,7 +152,7 @@ export function buildSalaryStatement(input: {
   if ((input.bonus || 0) > 0) {
     extras.push({
       label: "Bonus",
-      basis: "3W sales",
+      basis: "Bonus",
       rate: input.bonus || 0,
       amount: input.bonus || 0,
     });
@@ -252,7 +252,7 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
     if ((data.payroll.advance_deduction || 0) > 0) {
       rows.push({
         component: "Advance",
-        basis: "Salary advance deducted this month",
+        basis: "Advance",
         rate: num(data.payroll.advance_deduction || 0),
         amount: `−${num(data.payroll.advance_deduction || 0)}`,
       });
@@ -267,8 +267,8 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
         `Sunday work: ${hoursLabel(statement.sundayDays)} day${statement.sundayDays === 1 ? "" : "s"}`,
         `Overtime: ${hoursLabel(statement.otHours)} hour${statement.otHours === 1 ? "" : "s"}`,
         statement.lateHours > 0 ? `Late: ${hoursLabel(statement.lateHours)} hour${statement.lateHours === 1 ? "" : "s"}` : "",
-        bonusTotal > 0 ? `Bonus: LKR ${num(bonusTotal)}` : "",
-        (data.payroll.advance_deduction || 0) > 0 ? `Advance deducted: LKR ${num(data.payroll.advance_deduction || 0)}` : "",
+        bonusTotal > 0 ? "Bonus" : "",
+        (data.payroll.advance_deduction || 0) > 0 ? "Advance" : "",
       ].filter(Boolean).join(" | ")
     : "";
 
