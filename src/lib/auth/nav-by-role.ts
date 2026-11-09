@@ -1,9 +1,9 @@
 import {
   LayoutDashboard, ShoppingCart, Package, Users, UserCog,
   Landmark, BarChart3, Settings, TrendingUp,
-  Bike, Car, Wrench, Puzzle, Receipt, FileText,
+  Bike, Car, Truck, Wrench, Puzzle, Receipt, FileText,
   UserCheck, Calendar, ClipboardList, DollarSign,
-  CreditCard, Wallet, Hash, FolderOpen,
+  CreditCard, Wallet, Hash,
 } from "lucide-react";
 import type { AppRole } from "./roles";
 import { hasFullAccess } from "./roles";
@@ -15,6 +15,7 @@ const FULL_NAV: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Inventory", icon: Package, children: [
     { label: "TVS Bikes", href: "/inventory/bikes", icon: Bike },
+    { label: "3-Wheelers", href: "/inventory/three-wheelers", icon: Truck },
     { label: "Used Bikes", href: "/used-bikes", icon: Car },
     { label: "Spare Parts", href: "/spare-parts", icon: Wrench },
     { label: "Accessories", href: "/accessories", icon: Puzzle },
@@ -44,7 +45,6 @@ const FULL_NAV: NavItem[] = [
     { label: "Expenses", href: "/expenses", icon: Wallet },
   ]},
   { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -52,6 +52,7 @@ const WORKER_NAV: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Inventory", icon: Package, children: [
     { label: "TVS Bikes", href: "/inventory/bikes", icon: Bike },
+    { label: "3-Wheelers", href: "/inventory/three-wheelers", icon: Truck },
     { label: "Used Bikes", href: "/used-bikes", icon: Car },
     { label: "Spare Parts", href: "/spare-parts", icon: Wrench },
     { label: "Accessories", href: "/accessories", icon: Puzzle },
@@ -90,7 +91,6 @@ const ACCOUNTANT_NAV: NavItem[] = [
     { label: "Invoices", href: "/sales/invoices", icon: FileText },
   ]},
   { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Documents", href: "/documents", icon: FolderOpen },
 ];
 
 export function getNavForRole(role: AppRole): NavItem[] {

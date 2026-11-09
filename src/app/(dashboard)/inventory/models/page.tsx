@@ -402,7 +402,11 @@ function AddModelModal({
               <label className="text-sm font-medium text-[#1A1A1A]">Category</label>
               <select
                 value={form.bike_category}
-                onChange={(e) => setForm({ ...form, bike_category: e.target.value })}
+                onChange={(e) => setForm({
+                  ...form,
+                  bike_category: e.target.value,
+                  tvs_category: e.target.value === "3w" ? "3W" : "2W",
+                })}
                 className="w-full h-10 px-3 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white"
               >
                 <option value="scooter">Scooter</option>

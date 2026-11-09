@@ -150,8 +150,8 @@ export function buildSalaryStatement(input: {
   }
   if ((input.bonus || 0) > 0) {
     extras.push({
-      label: "Other bonus",
-      basis: "Added on payroll",
+      label: "Bonus",
+      basis: "3W sales",
       rate: input.bonus || 0,
       amount: input.bonus || 0,
     });
@@ -251,12 +251,14 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
   }
 
   const gross = statement?.gross ?? data.payroll.gross_salary;
+  const bonusTotal = (data.payroll.bonus || 0) + (data.payroll.attendance_bonus || 0);
   const noteBits = statement
     ? [
         `Commission: ${statement.bikeCount} bike${statement.bikeCount === 1 ? "" : "s"}`,
         `Sunday work: ${hoursLabel(statement.sundayDays)} day${statement.sundayDays === 1 ? "" : "s"}`,
         `Overtime: ${hoursLabel(statement.otHours)} hour${statement.otHours === 1 ? "" : "s"}`,
         statement.lateHours > 0 ? `Late: ${hoursLabel(statement.lateHours)} hour${statement.lateHours === 1 ? "" : "s"}` : "",
+        bonusTotal > 0 ? `Bonus: LKR ${num(bonusTotal)}` : "",
       ].filter(Boolean).join(" | ")
     : "";
 
@@ -319,7 +321,7 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
     tr.alt td { background: #F6F6F6; }
     .total td { background: #111; color: #fff; font-weight: 800; letter-spacing: 0.04em; font-size: 13px; border: 0; padding: 12px; text-transform: uppercase; }
     .total .gross { color: #FF4C00; font-size: 18px; letter-spacing: 0; }
-    .boxes { margin-top: 10px; display: grid; grid-template-columns: repeat(4, 1fr); background: #F3F3F3; }
+    .boxes { margin-top: 10px; display: grid; grid-template-columns: repeat(5, 1fr); background: #F3F3F3; }
     .box { padding: 14px 16px; }
     .box + .box { border-left: 1px solid #E4E4E4; }
     .box .k { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #555; text-transform: uppercase; }
@@ -403,6 +405,7 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
         <div class="box"><div class="k">Commission</div><div class="v">${lkr(statement?.bikeAmount ?? data.payroll.bike_commission)}</div></div>
         <div class="box"><div class="k">Sunday</div><div class="v">${lkr(statement?.sundayAmount ?? 0)}</div></div>
         <div class="box"><div class="k">OT</div><div class="v">${lkr(statement?.otAmount ?? data.payroll.ot_pay)}</div></div>
+        <div class="box"><div class="k">Bonus</div><div class="v">${lkr(bonusTotal)}</div></div>
       </div>
     </div>
 

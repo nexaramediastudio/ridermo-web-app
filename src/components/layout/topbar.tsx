@@ -11,6 +11,7 @@ const breadcrumbs: Record<string, { label: string; parent?: string; parentHref?:
   "/sales/invoices": { label: "Invoices", parent: "Sales", parentHref: "/sales" },
   "/customers": { label: "Customers" },
   "/inventory/bikes": { label: "TVS Bikes", parent: "Inventory" },
+  "/inventory/three-wheelers": { label: "3-Wheelers", parent: "Inventory" },
   "/inventory/models": { label: "Models", parent: "Inventory" },
   "/used-bikes": { label: "Used Bikes", parent: "Inventory" },
   "/spare-parts": { label: "Spare Parts", parent: "Inventory" },
@@ -27,7 +28,6 @@ const breadcrumbs: Record<string, { label: string; parent?: string; parentHref?:
   "/cr-plates": { label: "CR & Plates", parent: "Customers", parentHref: "/customers" },
   "/expenses": { label: "Expenses" },
   "/reports": { label: "Reports" },
-  "/documents": { label: "Documents" },
   "/notifications": { label: "Notifications" },
   "/settings": { label: "Settings" },
 };

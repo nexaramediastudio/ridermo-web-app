@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Users, Package, Landmark,
-  UserCog, CreditCard, FileText, BarChart3, FolderOpen,
-  Bell, Settings, ChevronDown, ChevronRight, Bike, Car,
+  UserCog, CreditCard, FileText, BarChart3,
+  Bell, Settings, ChevronDown, ChevronRight, Bike, Car, Truck,
   Wrench, Puzzle, UserCheck, Calendar, ClipboardList,
   DollarSign, Receipt, Hash, Wallet, LogOut,
 } from "lucide-react";
@@ -44,6 +44,7 @@ const navigation: NavItem[] = [
     label: "Inventory", icon: Package,
     children: [
       { label: "TVS Bikes", href: "/inventory/bikes", icon: Bike },
+      { label: "3-Wheelers", href: "/inventory/three-wheelers", icon: Truck },
       { label: "Used Bikes", href: "/used-bikes", icon: Car },
       { label: "Spare Parts", href: "/spare-parts", icon: Wrench },
       { label: "Accessories", href: "/accessories", icon: Puzzle },
@@ -70,7 +71,6 @@ const navigation: NavItem[] = [
   },
   { label: "Expenses", href: "/expenses", icon: Wallet },
   { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Notifications", href: "/notifications", icon: Bell },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
@@ -78,8 +78,8 @@ const navigation: NavItem[] = [
 const NAV_GROUPS = [
   { label: "MAIN", items: navigation.slice(0, 4) },
   { label: "FINANCE", items: navigation.slice(4, 7) },
-  { label: "OPERATIONS", items: navigation.slice(7, 11) },
-  { label: "SYSTEM", items: navigation.slice(11) },
+  { label: "OPERATIONS", items: navigation.slice(7, 10) },
+  { label: "SYSTEM", items: navigation.slice(10) },
 ];
 
 function NavItemComponent({ item, depth = 0 }: { item: NavItem; depth?: number }) {

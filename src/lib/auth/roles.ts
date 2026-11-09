@@ -38,7 +38,6 @@ const ACCOUNTANT_PREFIXES = [
   "/hr/commissions",
   "/sales",
   "/reports",
-  "/documents",
   "/notifications",
 ];
 
@@ -48,7 +47,6 @@ const WORKER_BLOCKED_PREFIXES = [
   "/cheques",
   "/expenses",
   "/reports",
-  "/documents",
   "/settings",
   "/hr/employees",
   "/hr/payroll",

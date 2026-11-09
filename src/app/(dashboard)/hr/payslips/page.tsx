@@ -220,13 +220,18 @@ export default function PayslipsPage() {
     try {
       await syncWorkerCommissionsForMonth(supabase, year, month);
 
-      const [empRes, attRes, commRes] = await Promise.all([
+      const [empRes, attRes, commRes, payRes] = await Promise.all([
         supabase
           .from("employees")
           .select("id, type, basic_salary, hourly_rate, salary_type, has_epf, has_etf")
           .eq("is_active", true),
         supabase.from("attendance").select("employee_id, status, ot_hours, late_hours, date, is_holiday").gte("date", monthStart).lt("date", monthEnd),
         supabase.from("worker_commissions").select("employee_id, amount").gte("sale_date", monthStart).lt("sale_date", monthEnd),
+        supabase
+          .from("payroll")
+          .select("employee_id, attendance_bonus, bonus, other_deductions, status, notes, paid_date")
+          .eq("month", month)
+          .eq("year", year),
       ]);
 
       const emps = empRes.data || [];
@@ -239,8 +244,21 @@ export default function PayslipsPage() {
       (commRes.data || []).forEach((c) => {
         commTotals[c.employee_id] = (commTotals[c.employee_id] || 0) + Number(c.amount);
       });
+      const existingByEmp: Record<string, {
+        attendance_bonus?: number | null;
+        bonus?: number | null;
+        other_deductions?: number | null;
+        status?: string | null;
+        notes?: string | null;
+        paid_date?: string | null;
+      }> = {};
+      (payRes.data || []).forEach((p) => { existingByEmp[p.employee_id] = p; });
 
       const records = emps.map((emp) => {
+        const existing = existingByEmp[emp.id];
+        const attendanceBonus = Number(existing?.attendance_bonus || 0);
+        const bonus = Number(existing?.bonus || 0);
+        const otherDeductions = Number(existing?.other_deductions || 0);
         const calc = calculatePayroll({
           salaryType: (emp.salary_type as "monthly" | "hourly") || "monthly",
           basicSalary: Number(emp.basic_salary || 0),
@@ -249,26 +267,31 @@ export default function PayslipsPage() {
           hasEtf: emp.has_etf ?? false,
           attendance: summarizeAttendance(attByEmp[emp.id] || []),
           bikeCommission: emp.type === "worker" ? commTotals[emp.id] || 0 : 0,
+          attendanceBonus,
+          bonus,
+          otherDeductions,
         });
         return {
           employee_id: emp.id,
           month,
           year,
           basic_salary: calc.earnedBasic,
-          attendance_bonus: 0,
+          attendance_bonus: attendanceBonus,
           ot_pay: calc.otPay,
           bike_commission: calc.bikeCommission,
-          bonus: 0,
+          bonus,
           gross_salary: calc.gross,
           epf_employee: calc.epf,
           etf: calc.etf,
-          other_deductions: 0,
+          other_deductions: otherDeductions,
           total_deductions: calc.totalDeductions,
           net_salary: calc.net,
           working_days: calc.workingDays,
           present_days: calc.presentDays,
           absent_days: calc.absentDays,
-          status: "draft" as const,
+          status: (existing?.status as "draft" | "approved" | "paid") || "draft",
+          notes: existing?.notes || null,
+          paid_date: existing?.paid_date || null,
         };
       });
 
@@ -323,7 +346,7 @@ export default function PayslipsPage() {
       <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex items-start gap-2">
         <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800">
-          Click <strong>Generate All Payslips</strong> to build payroll for this month from attendance and sales, then print each employee&apos;s slip individually.
+          Click <strong>Generate All Payslips</strong> to rebuild this month from attendance and sales. Bonus and extra amounts already saved on Payroll are kept.
         </p>
       </div>
 

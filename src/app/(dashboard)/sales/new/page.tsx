@@ -8,6 +8,7 @@ import {
   Bike, User, CreditCard, CheckCircle2, ChevronRight,
   Search, X, Plus, Building2, Shield, AlertCircle, ArrowLeft, Calendar,
 } from "lucide-react";
+import { isThreeWheeler } from "@/lib/inventory/vehicle-kind";
 import { calcDealershipIncome } from "@/lib/finance/dealership-income";
 import { createPendingCommissionRecords } from "@/lib/finance/commission-records";
 import { syncWorkerCommissionsForDate } from "@/lib/hr/worker-commissions";
@@ -18,7 +19,7 @@ interface StockBike {
   chassis_number: string;
   engine_number: string;
   selling_price: number;
-  bike_models: { id: string; name: string; bike_category: string; fuel_type: string } | null;
+  bike_models: { id: string; name: string; bike_category: string; fuel_type: string; tvs_category?: string } | null;
   bike_colors: { id: string; name: string; hex_code?: string } | null;
 }
 
@@ -136,7 +137,7 @@ export default function NewSalePage() {
     const supabase = createClient();
     let query = supabase
       .from("inventory_bikes")
-      .select("id, round_number, chassis_number, engine_number, selling_price, bike_models(id, name, bike_category, fuel_type), bike_colors(id, name, hex_code)")
+      .select("id, round_number, chassis_number, engine_number, selling_price, bike_models(id, name, bike_category, fuel_type, tvs_category), bike_colors(id, name, hex_code)")
       .eq("status", "in_stock")
       .order("round_number");
     if (q) query = query.ilike("round_number", `%${q}%`);
@@ -380,8 +381,8 @@ export default function NewSalePage() {
           {step === 1 && (
             <div className="r-card p-6 space-y-5">
               <div>
-                <h2 className="r-section-title">Select Bike</h2>
-                <p className="text-[11px] text-[#ABABAB] mt-0.5">Choose a bike from in-stock inventory</p>
+                <h2 className="r-section-title">Select Vehicle</h2>
+                <p className="text-[11px] text-[#ABABAB] mt-0.5">Choose a bike or 3-wheeler from in-stock inventory</p>
               </div>
 
               <div className="relative">
@@ -404,7 +405,7 @@ export default function NewSalePage() {
                     <div className="w-12 h-12 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mx-auto mb-3">
                       <Bike className="h-6 w-6 text-[#ABABAB]" />
                     </div>
-                    <p className="text-[13px] font-semibold text-[#4A4A4A]">No bikes in stock</p>
+                    <p className="text-[13px] font-semibold text-[#4A4A4A]">No vehicles in stock</p>
                   </div>
                 ) : (
                   bikes.map((bike) => (
@@ -424,6 +425,9 @@ export default function NewSalePage() {
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-bold text-[#FF4C00]">{bike.round_number}</span>
                           <span className="text-[13px] font-semibold text-[#0A0A0A]">{bike.bike_models?.name}</span>
+                          {isThreeWheeler(bike.bike_models) && (
+                            <span className="text-[9px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded-full">3W</span>
+                          )}
                           {bike.bike_colors?.hex_code && (
                             <div className="flex items-center gap-1 ml-1">
                               <div className="w-3 h-3 rounded-full border border-[#E8E8E8]" style={{ backgroundColor: bike.bike_colors.hex_code }} />

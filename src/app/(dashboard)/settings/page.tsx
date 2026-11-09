@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
-  Building2, Shield, Users, Settings2, Bike,
+  Building2, Shield, Users, Settings2, Bike, Truck,
   Plus, X, Edit2, Check, Save, Trash2, Search,
   Phone, Mail, MapPin, Globe, Key,
   Zap, Fuel, ChevronDown, ChevronUp, Palette, Upload, ImageIcon,
@@ -16,12 +16,14 @@ import {
   removeCompanyLogo,
   type CompanySettings as CompanySettingsData,
 } from "@/lib/company-settings";
+import { matchesVehicleKind, type VehicleKind } from "@/lib/inventory/vehicle-kind";
 
-type Tab = "company" | "bikes" | "finance" | "insurance" | "users" | "security";
+type Tab = "company" | "bikes" | "threeWheelers" | "finance" | "insurance" | "users" | "security";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "company", label: "Company", icon: Building2 },
   { id: "bikes", label: "Bike Models", icon: Bike },
+  { id: "threeWheelers", label: "3-Wheeler Models", icon: Truck },
   { id: "finance", label: "Finance Companies", icon: Building2 },
   { id: "insurance", label: "Insurance Companies", icon: Shield },
   { id: "users", label: "Users", icon: Users },
@@ -603,6 +605,7 @@ function SecuritySettings() {
 interface BikeModelRow {
   id: string;
   name: string;
+  tvs_category?: "2W" | "3W";
   bike_category: "scooter" | "motorbike" | "moped" | "3w";
   fuel_type: "petrol" | "electric" | "diesel";
   mrp: number;
@@ -612,11 +615,22 @@ interface BikeModelRow {
   bike_colors?: { id: string; name: string; hex_code?: string }[];
 }
 
-const CATEGORY_OPTIONS = ["scooter", "motorbike", "moped", "3w"] as const;
+const BIKE_CATEGORY_OPTIONS = ["scooter", "motorbike", "moped"] as const;
 const FUEL_OPTIONS = ["petrol", "electric", "diesel"] as const;
 const CATEGORY_LABELS: Record<string, string> = { scooter: "Scooter", motorbike: "Motorbike", moped: "Moped", "3w": "3-Wheeler" };
 
-function BikeModelsSettings() {
+function BikeModelsSettings({ kind = "2w" }: { kind?: VehicleKind }) {
+  const is3w = kind === "3w";
+  const title = is3w ? "3-Wheeler Models" : "Bike Models";
+  const subtitle = is3w
+    ? "Add, edit or remove 3-wheeler models and their colors"
+    : "Add, edit or remove TVS bike models and their colors";
+  const addHeading = is3w ? "New 3-Wheeler Model" : "New Bike Model";
+  const placeholder = is3w ? "e.g. TVS KING" : "e.g. TVS RAIDER 125";
+  const emptyTitle = is3w ? "No 3-wheeler models yet" : "No bike models yet";
+  const emptyHint = is3w ? "Add your first 3-wheeler model above" : "Add your first TVS model above";
+  const Icon = is3w ? Truck : Bike;
+  const categoryOptions = is3w ? (["3w"] as const) : BIKE_CATEGORY_OPTIONS;
   const [models, setModels] = useState<BikeModelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -627,7 +641,7 @@ function BikeModelsSettings() {
   const [newColorName, setNewColorName] = useState("");
   const [newColorHex, setNewColorHex] = useState("#FF4C00");
   const [addForm, setAddForm] = useState({
-    name: "", bike_category: "scooter", fuel_type: "petrol",
+    name: "", bike_category: is3w ? "3w" : "scooter", fuel_type: "petrol",
     mrp: "", default_discount: "", selling_price: "",
   });
   const [savingAdd, setSavingAdd] = useState(false);
@@ -639,9 +653,9 @@ function BikeModelsSettings() {
       .from("bike_models")
       .select("*, bike_colors(id, name, hex_code)")
       .order("name");
-    setModels(data || []);
+    setModels((data || []).filter((m) => matchesVehicleKind(m, kind)));
     setLoading(false);
-  }, []);
+  }, [kind]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -649,10 +663,11 @@ function BikeModelsSettings() {
     e.preventDefault();
     setSavingAdd(true);
     const supabase = createClient();
+    const bikeCategory = is3w ? "3w" : addForm.bike_category;
     const { error } = await supabase.from("bike_models").insert({
       name: addForm.name.toUpperCase().trim(),
-      bike_category: addForm.bike_category,
-      tvs_category: "2W",
+      bike_category: bikeCategory,
+      tvs_category: is3w ? "3W" : "2W",
       fuel_type: addForm.fuel_type,
       mrp: parseFloat(addForm.mrp) || 0,
       default_discount: parseFloat(addForm.default_discount) || 0,
@@ -660,9 +675,9 @@ function BikeModelsSettings() {
     });
     if (error) toast.error(error.message);
     else {
-      toast.success("Bike model added");
+      toast.success(is3w ? "3-wheeler model added" : "Bike model added");
       setShowAdd(false);
-      setAddForm({ name: "", bike_category: "scooter", fuel_type: "petrol", mrp: "", default_discount: "", selling_price: "" });
+      setAddForm({ name: "", bike_category: is3w ? "3w" : "scooter", fuel_type: "petrol", mrp: "", default_discount: "", selling_price: "" });
       load();
     }
     setSavingAdd(false);
@@ -670,9 +685,11 @@ function BikeModelsSettings() {
 
   async function handleSaveEdit(id: string) {
     const supabase = createClient();
+    const bikeCategory = is3w ? "3w" : editForm.bike_category;
     const { error } = await supabase.from("bike_models").update({
       name: editForm.name?.toUpperCase().trim(),
-      bike_category: editForm.bike_category,
+      bike_category: bikeCategory,
+      tvs_category: is3w ? "3W" : "2W",
       fuel_type: editForm.fuel_type,
       mrp: editForm.mrp || 0,
       default_discount: editForm.default_discount || 0,
@@ -716,8 +733,8 @@ function BikeModelsSettings() {
     <div className="space-y-4 max-w-2xl">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>Bike Models</h3>
-          <p className="text-sm text-[#9A9A9A] mt-0.5">Add, edit or remove TVS models and their colors</p>
+          <h3 className="text-base font-bold text-[#0A0A0A]" style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>{title}</h3>
+          <p className="text-sm text-[#9A9A9A] mt-0.5">{subtitle}</p>
         </div>
         <button
           onClick={() => setShowAdd(!showAdd)}
@@ -730,24 +747,26 @@ function BikeModelsSettings() {
       {/* Add new model form */}
       {showAdd && (
         <form onSubmit={handleAdd} className="p-4 bg-[#FF4C00]/3 border border-[#FF4C00]/20 rounded-2xl space-y-3">
-          <p className="text-xs font-bold text-[#FF4C00] uppercase tracking-wider">New Bike Model</p>
+          <p className="text-xs font-bold text-[#FF4C00] uppercase tracking-wider">{addHeading}</p>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-[#6B6B6B]">Model Name <span className="text-[#FF4C00]">*</span></label>
             <input
               value={addForm.name}
               onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
               required
-              placeholder="e.g. TVS RAIDER 125"
+              placeholder={placeholder}
               className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white uppercase font-semibold"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[#6B6B6B]">Category</label>
-              <select value={addForm.bike_category} onChange={(e) => setAddForm({ ...addForm, bike_category: e.target.value })} className="w-full h-10 px-3 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white">
-                {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-              </select>
-            </div>
+          <div className={`grid gap-3 ${is3w ? "grid-cols-1" : "grid-cols-2"}`}>
+            {!is3w && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[#6B6B6B]">Category</label>
+                <select value={addForm.bike_category} onChange={(e) => setAddForm({ ...addForm, bike_category: e.target.value })} className="w-full h-10 px-3 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white">
+                  {categoryOptions.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                </select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-[#6B6B6B]">Fuel Type</label>
               <select value={addForm.fuel_type} onChange={(e) => setAddForm({ ...addForm, fuel_type: e.target.value })} className="w-full h-10 px-3 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white">
@@ -785,9 +804,9 @@ function BikeModelsSettings() {
         </div>
       ) : models.length === 0 ? (
         <div className="text-center py-12 text-[#ABABAB]">
-          <Bike className="h-10 w-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm font-medium">No bike models yet</p>
-          <p className="text-xs mt-1">Add your first TVS model above</p>
+          <Icon className="h-10 w-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm font-medium">{emptyTitle}</p>
+          <p className="text-xs mt-1">{emptyHint}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -807,13 +826,15 @@ function BikeModelsSettings() {
                       <label className="text-xs font-medium text-[#6B6B6B]">Model Name</label>
                       <input value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full h-10 px-4 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] uppercase font-semibold" />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-[#6B6B6B]">Category</label>
-                        <select value={editForm.bike_category || "scooter"} onChange={(e) => setEditForm({ ...editForm, bike_category: e.target.value as BikeModelRow["bike_category"] })} className="w-full h-10 px-3 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white">
-                          {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                        </select>
-                      </div>
+                    <div className={`grid gap-3 ${is3w ? "grid-cols-1" : "grid-cols-2"}`}>
+                      {!is3w && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[#6B6B6B]">Category</label>
+                          <select value={editForm.bike_category || "scooter"} onChange={(e) => setEditForm({ ...editForm, bike_category: e.target.value as BikeModelRow["bike_category"] })} className="w-full h-10 px-3 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white">
+                            {categoryOptions.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                          </select>
+                        </div>
+                      )}
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-[#6B6B6B]">Fuel Type</label>
                         <select value={editForm.fuel_type || "petrol"} onChange={(e) => setEditForm({ ...editForm, fuel_type: e.target.value as BikeModelRow["fuel_type"] })} className="w-full h-10 px-3 rounded-xl border border-[#E5E5E5] text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4C00]/20 focus:border-[#FF4C00] bg-white">
@@ -847,7 +868,7 @@ function BikeModelsSettings() {
                   <div className="flex items-center gap-3 px-4 py-3">
                     {/* Icon */}
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${model.is_active ? "bg-[#FF4C00]/10" : "bg-[#F5F5F5]"}`}>
-                      <Bike className={`h-4.5 w-4.5 ${model.is_active ? "text-[#FF4C00]" : "text-[#ABABAB]"}`} />
+                      <Icon className={`h-4.5 w-4.5 ${model.is_active ? "text-[#FF4C00]" : "text-[#ABABAB]"}`} />
                     </div>
                     {/* Details */}
                     <div className="flex-1 min-w-0">
@@ -1118,10 +1139,11 @@ export default function SettingsPage() {
           {activeTab === "company" && <CompanySettings />}
           {activeTab === "bikes" && (
             <>
-              <BikeModelsSettings />
+              <BikeModelsSettings kind="2w" />
               <InventoryBikesSettings />
             </>
           )}
+          {activeTab === "threeWheelers" && <BikeModelsSettings kind="3w" />}
           {activeTab === "finance" && (
             <CompanyList
               tableName="finance_companies"
