@@ -41,6 +41,7 @@ export interface PayslipData {
     epf_employee: number;
     etf: number;
     other_deductions: number;
+    advance_deduction?: number;
     total_deductions: number;
     net_salary: number;
     working_days: number;
@@ -248,6 +249,14 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
         amount: num(extra.amount),
       });
     }
+    if ((data.payroll.advance_deduction || 0) > 0) {
+      rows.push({
+        component: "Advance",
+        basis: "Salary advance deducted this month",
+        rate: num(data.payroll.advance_deduction || 0),
+        amount: `−${num(data.payroll.advance_deduction || 0)}`,
+      });
+    }
   }
 
   const gross = statement?.gross ?? data.payroll.gross_salary;
@@ -259,6 +268,7 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
         `Overtime: ${hoursLabel(statement.otHours)} hour${statement.otHours === 1 ? "" : "s"}`,
         statement.lateHours > 0 ? `Late: ${hoursLabel(statement.lateHours)} hour${statement.lateHours === 1 ? "" : "s"}` : "",
         bonusTotal > 0 ? `Bonus: LKR ${num(bonusTotal)}` : "",
+        (data.payroll.advance_deduction || 0) > 0 ? `Advance deducted: LKR ${num(data.payroll.advance_deduction || 0)}` : "",
       ].filter(Boolean).join(" | ")
     : "";
 
@@ -406,6 +416,7 @@ export function buildPayslipHtml(data: PayslipData, autoPrint = true): string {
         <div class="box"><div class="k">Sunday</div><div class="v">${lkr(statement?.sundayAmount ?? 0)}</div></div>
         <div class="box"><div class="k">OT</div><div class="v">${lkr(statement?.otAmount ?? data.payroll.ot_pay)}</div></div>
         <div class="box"><div class="k">Bonus</div><div class="v">${lkr(bonusTotal)}</div></div>
+        ${(data.payroll.advance_deduction || 0) > 0 ? `<div class="box"><div class="k">Advance</div><div class="v">${lkr(-(data.payroll.advance_deduction || 0))}</div></div>` : ""}
       </div>
     </div>
 

@@ -50,6 +50,7 @@ interface PayrollEntry {
   ot_hours?: number;
   late_hours?: number;
   late_deduction?: number;
+  advance_deduction?: number;
   status: "draft" | "approved" | "paid";
 }
 
@@ -81,7 +82,7 @@ export default function PayrollPage() {
 
     await syncWorkerCommissionsForMonth(supabase, year, month);
 
-    const [empRes, payRes, attRes, commRes] = await Promise.all([
+    const [empRes, payRes, attRes, commRes, advRes] = await Promise.all([
       supabase.from("employees").select("id, full_name, type, employee_code, basic_salary, hourly_rate, salary_type, has_epf, has_etf, is_active, per_bike_commission").eq("is_active", true).order("full_name"),
       supabase.from("payroll").select("*").eq("month", month).eq("year", year),
       supabase.from("attendance").select("employee_id, status, ot_hours, late_hours, date, is_holiday").gte("date", monthStart).lt("date", monthEnd),
@@ -91,6 +92,11 @@ export default function PayrollPage() {
         .select("employee_id, amount")
         .gte("sale_date", monthStart)
         .lt("sale_date", monthEnd),
+      supabase
+        .from("salary_advances")
+        .select("employee_id, amount")
+        .gte("advance_date", monthStart)
+        .lt("advance_date", monthEnd),
     ]);
 
     const emps = empRes.data || [];
@@ -112,6 +118,11 @@ export default function PayrollPage() {
     });
     setBikeCounts(counts);
 
+    const advanceTotals: Record<string, number> = {};
+    (advRes.data || []).forEach((a) => {
+      advanceTotals[a.employee_id] = (advanceTotals[a.employee_id] || 0) + Number(a.amount || 0);
+    });
+
     setEmployees(emps);
 
     // Build payroll map
@@ -130,6 +141,7 @@ export default function PayrollPage() {
         attendanceBonus: existing?.attendance_bonus ?? 0,
         bonus: existing?.bonus ?? 0,
         otherDeductions: existing?.other_deductions ?? 0,
+        advanceDeduction: advanceTotals[emp.id] || 0,
       });
 
       payMap[emp.id] = {
@@ -158,6 +170,7 @@ export default function PayrollPage() {
         ot_hours: attSummary.otHours,
         late_hours: calc.lateHours,
         late_deduction: calc.lateDeduction,
+        advance_deduction: advanceTotals[emp.id] || 0,
         status: existing?.status ?? "draft",
       };
     });
@@ -173,7 +186,7 @@ export default function PayrollPage() {
     const emp = employees.find((e) => e.id === empId);
     const epf = emp?.has_epf ? Math.round(gross * 0.08) : 0;
     const etf = emp?.has_etf ? Math.round(gross * 0.03) : 0;
-    const totalDed = epf + etf + (current.other_deductions || 0);
+    const totalDed = epf + etf + (current.other_deductions || 0) + (current.advance_deduction || 0);
     const net = gross - totalDed;
     setPayroll((prev) => ({
       ...prev,
@@ -184,7 +197,7 @@ export default function PayrollPage() {
   async function handleSaveAll() {
     setSaving(true);
     const supabase = createClient();
-    const records = Object.values(payroll).map(({ hours_worked: _h, ot_hours: _ot, late_hours: _lh, late_deduction: _ld, worked_days: _w, leave_days: _l, sunday_holiday_days: _s, ...p }) => p);
+    const records = Object.values(payroll).map(({ hours_worked: _h, ot_hours: _ot, late_hours: _lh, late_deduction: _ld, worked_days: _w, leave_days: _l, sunday_holiday_days: _s, advance_deduction: _a, ...p }) => p);
     const { error } = await supabase.from("payroll").upsert(records, { onConflict: "employee_id,month,year" });
     if (error) toast.error(error.message);
     else { toast.success("Payroll saved"); loadPayroll(); }
@@ -463,6 +476,11 @@ export default function PayrollPage() {
                         <span className="text-base font-bold text-[#FF4C00]">
                           Rs. {entry.net_salary.toLocaleString("en", { maximumFractionDigits: 0 })}
                         </span>
+                        {(entry.advance_deduction || 0) > 0 && (
+                          <p className="text-[10px] text-[#9A9A9A] mt-0.5">
+                            − Advance Rs. {entry.advance_deduction!.toLocaleString("en", { maximumFractionDigits: 0 })}
+                          </p>
+                        )}
                       </td>
                       {/* Status */}
                       <td className="px-4 py-3">
@@ -509,6 +527,7 @@ export default function PayrollPage() {
           <p>• <strong>Late</strong> removes one hour of salary for each hour marked late on attendance. Monthly staff lose basic ÷ 26 ÷ 8 per late hour</p>
           <p>• EPF/ETF only if ticked on the employee profile</p>
           <p>• Bike commission: each completed sale that month, if the worker was present or half-day that day. Open <strong>Worker Commissions</strong> or click Recalculate.</p>
+          <p>• <strong>Advance</strong> money from HR → Advances is deducted from net salary for this month</p>
           <p>• Generate slips per employee under <strong>Payslips</strong> after saving payroll</p>
         </div>
       </div>

@@ -28,6 +28,7 @@ export interface PayrollCalcInput {
   otPay?: number;
   bonus?: number;
   otherDeductions?: number;
+  advanceDeduction?: number;
 }
 
 export interface PayrollCalcResult {
@@ -125,11 +126,12 @@ export function calculatePayroll(input: PayrollCalcInput): PayrollCalcResult {
   const attendanceBonus = Math.round(input.attendanceBonus || 0);
   const bonus = Math.round(input.bonus || 0);
   const otherDeductions = Math.round(input.otherDeductions || 0);
+  const advanceDeduction = Math.round(input.advanceDeduction || 0);
 
   const gross = earnedBasic + attendanceBonus + otPay + bikeCommission + bonus;
   const epf = input.hasEpf ? Math.round(gross * EPF_RATE) : 0;
   const etf = input.hasEtf ? Math.round(gross * ETF_RATE) : 0;
-  const totalDeductions = epf + etf + otherDeductions;
+  const totalDeductions = epf + etf + otherDeductions + advanceDeduction;
   const net = gross - totalDeductions;
 
   return {

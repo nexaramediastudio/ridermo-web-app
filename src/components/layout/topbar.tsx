@@ -20,6 +20,7 @@ const breadcrumbs: Record<string, { label: string; parent?: string; parentHref?:
   "/hr/employees": { label: "Employees", parent: "HR" },
   "/hr/attendance": { label: "Attendance", parent: "HR" },
   "/hr/leave": { label: "Leave", parent: "HR" },
+  "/hr/advances": { label: "Advances", parent: "HR" },
   "/hr/commissions": { label: "Worker Commissions", parent: "HR" },
   "/hr/payroll": { label: "Payroll", parent: "HR" },
   "/hr/payslips": { label: "Payslips", parent: "HR" },

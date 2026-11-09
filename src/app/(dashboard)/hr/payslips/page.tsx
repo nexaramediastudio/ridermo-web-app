@@ -77,6 +77,7 @@ function toPayslipData(
   attendance: AttendanceSummary,
   bikes: BikeStat,
   company: { name: string; logoUrl: string | null },
+  advanceDeduction = 0,
 ): PayslipData {
   const emp = row.employees!;
   const monthShort = MONTHS[row.month - 1].slice(0, 3).toUpperCase();
@@ -126,6 +127,7 @@ function toPayslipData(
       epf_employee: row.epf_employee,
       etf: row.etf,
       other_deductions: row.other_deductions,
+      advance_deduction: advanceDeduction,
       total_deductions: row.total_deductions,
       net_salary: row.net_salary,
       working_days: row.working_days,
@@ -146,6 +148,7 @@ export default function PayslipsPage() {
   const [payslips, setPayslips] = useState<PayslipRow[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceSummary>>({});
   const [bikeMap, setBikeMap] = useState<Record<string, BikeStat>>({});
+  const [advanceMap, setAdvanceMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -172,7 +175,7 @@ export default function PayslipsPage() {
     setPayslips(rows);
 
     if (rows.length) {
-      const [{ data: att }, { data: comms }] = await Promise.all([
+      const [{ data: att }, { data: comms }, { data: advs }] = await Promise.all([
         supabase
           .from("attendance")
           .select("employee_id, status, ot_hours, late_hours, date, is_holiday")
@@ -183,6 +186,11 @@ export default function PayslipsPage() {
           .select("employee_id, amount")
           .gte("sale_date", monthStart)
           .lt("sale_date", monthEnd),
+        supabase
+          .from("salary_advances")
+          .select("employee_id, amount")
+          .gte("advance_date", monthStart)
+          .lt("advance_date", monthEnd),
       ]);
       const byEmp: Record<string, { status: string; ot_hours?: number | null; late_hours?: number | null; date?: string | null; is_holiday?: boolean | null }[]> = {};
       (att || []).forEach((r) => {
@@ -199,11 +207,17 @@ export default function PayslipsPage() {
         bikes[c.employee_id].count += 1;
         bikes[c.employee_id].amount += Number(c.amount || 0);
       });
+      const advances: Record<string, number> = {};
+      (advs || []).forEach((a) => {
+        advances[a.employee_id] = (advances[a.employee_id] || 0) + Number(a.amount || 0);
+      });
       setAttendanceMap(summaries);
       setBikeMap(bikes);
+      setAdvanceMap(advances);
     } else {
       setAttendanceMap({});
       setBikeMap({});
+      setAdvanceMap({});
     }
 
     setLoading(false);
@@ -220,7 +234,7 @@ export default function PayslipsPage() {
     try {
       await syncWorkerCommissionsForMonth(supabase, year, month);
 
-      const [empRes, attRes, commRes, payRes] = await Promise.all([
+      const [empRes, attRes, commRes, payRes, advRes] = await Promise.all([
         supabase
           .from("employees")
           .select("id, type, basic_salary, hourly_rate, salary_type, has_epf, has_etf")
@@ -232,6 +246,11 @@ export default function PayslipsPage() {
           .select("employee_id, attendance_bonus, bonus, other_deductions, status, notes, paid_date")
           .eq("month", month)
           .eq("year", year),
+        supabase
+          .from("salary_advances")
+          .select("employee_id, amount")
+          .gte("advance_date", monthStart)
+          .lt("advance_date", monthEnd),
       ]);
 
       const emps = empRes.data || [];
@@ -253,6 +272,10 @@ export default function PayslipsPage() {
         paid_date?: string | null;
       }> = {};
       (payRes.data || []).forEach((p) => { existingByEmp[p.employee_id] = p; });
+      const advanceTotals: Record<string, number> = {};
+      (advRes.data || []).forEach((a) => {
+        advanceTotals[a.employee_id] = (advanceTotals[a.employee_id] || 0) + Number(a.amount || 0);
+      });
 
       const records = emps.map((emp) => {
         const existing = existingByEmp[emp.id];
@@ -270,6 +293,7 @@ export default function PayslipsPage() {
           attendanceBonus,
           bonus,
           otherDeductions,
+          advanceDeduction: advanceTotals[emp.id] || 0,
         });
         return {
           employee_id: emp.id,
@@ -321,6 +345,7 @@ export default function PayslipsPage() {
     attendanceMap[row.employee_id] || EMPTY_ATTENDANCE,
     bikeMap[row.employee_id] || { count: 0, amount: 0 },
     company,
+    advanceMap[row.employee_id] || 0,
   );
   const preview = payslips.find((p) => p.id === previewId);
 
